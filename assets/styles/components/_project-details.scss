@@ -1,0 +1,212 @@
+@use '../abstracts/token';
+
+// =============================================
+// Outer white card wrapper
+// =============================================
+.project-details-card {
+    background: token.$white;
+    border-radius: 20px;
+    padding: 32px;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+    border: 1px solid token.$gray-100;
+}
+
+// =============================================
+// Back link
+// =============================================
+.pd-back-link {
+    text-decoration: none;
+    color: token.$gray-500;
+    font-size: 0.875rem;
+    transition: color 0.15s ease;
+
+    &:hover {
+        color: token.$gray-800;
+    }
+}
+
+// =============================================
+// Header
+// =============================================
+.pd-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: token.$gray-800;
+    margin-bottom: 4px;
+}
+
+.pd-description {
+    color: token.$gray-500;
+    margin: 0;
+    font-size: 0.9375rem;
+}
+
+.pd-options-btn {
+    background: token.$white;
+    border: 1px solid token.$gray-200;
+    border-radius: 8px;
+    padding: 0.5rem 0.75rem;
+    color: token.$gray-500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    flex-shrink: 0;
+
+    &:hover {
+        background: token.$gray-50;
+        color: token.$gray-700;
+    }
+}
+
+// =============================================
+// Stat cards
+// =============================================
+.pd-stat-card {
+    background: token.$gray-50;
+    border: 1px solid token.$gray-200;
+    border-radius: 14px;
+    transition: box-shadow 0.2s ease;
+
+    &:hover {
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.07);
+    }
+}
+
+.pd-stat-label {
+    font-size: 0.875rem;
+    color: token.$gray-500;
+}
+
+.pd-stat-value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: token.$gray-800;
+    margin-bottom: 4px !important;
+}
+
+.pd-stat-deadline {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: token.$gray-800;
+}
+
+// Icons — couleurs thème
+.pd-icon {
+    font-size: 1.1rem;
+
+    &--primary {
+        color: token.$clr-indigo; // indigo sidebar
+    }
+
+    &--success {
+        color: #16a34a;
+    }
+
+    &--accent {
+        color: token.$clr_accent;
+    }
+}
+
+// =============================================
+// Progress bar
+// =============================================
+.pd-progress-track {
+    height: 6px;
+    background-color: token.$gray-200;
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.pd-progress-bar {
+    height: 100%;
+    background-color: token.$clr_primary;
+    border-radius: 999px;
+    transition: width 0.5s ease-out;
+}
+
+// =============================================
+// Section titles
+// =============================================
+.pd-section-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: token.$gray-800;
+}
+
+// =============================================
+// Filter buttons
+// =============================================
+.pd-filter-btn {
+    background: token.$gray-100;
+    border: 1px solid token.$gray-200;
+    color: token.$gray-600;
+    border-radius: 999px;
+    padding: 0.375rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+
+    &:hover {
+        background: token.$gray-200;
+        color: token.$gray-800;
+    }
+
+    &.active {
+        background: token.$clr-indigo;
+        border-color: token.$clr-indigo;
+        color: token.$white;
+    }
+}
+
+// =============================================
+// Task cards
+// =============================================
+.pd-task-card {
+    background: token.$gray-50;
+    border: 1px solid token.$gray-200;
+    border-radius: 12px;
+    transition: box-shadow 0.15s ease;
+
+    &:hover {
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+    }
+}
+
+.pd-empty-tasks {
+    color: token.$gray-400;
+    font-style: italic;
+    padding: 2rem;
+    text-align: center;
+    border: 1px solid token.$gray-200;
+    border-radius: 12px;
+    background: token.$gray-50;
+}
+
+// =============================================
+// Team card
+// =============================================
+.pd-team-card {
+    background: token.$gray-50;
+    border: 1px solid token.$gray-200;
+    border-radius: 14px;
+    height: 100%;
+}
+
+.pd-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: rgba(token.$clr_primary, 0.12);
+    color: token.$clr_primary;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.875rem;
+    flex-shrink: 0;
+}
+
+.pd-avatar-meta {
+    font-size: 0.8125rem;
+    color: token.$gray-500;
+}

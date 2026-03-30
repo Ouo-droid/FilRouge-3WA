@@ -1,0 +1,61 @@
+@use '../abstracts/token';
+
+.badge {
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid transparent;
+
+    i {
+        font-size: 0.8em;
+    }
+}
+
+// Role color badges
+.bg-purple {
+    background-color: #7c3aed;
+    color: #ffffff;
+}
+
+// Entity-specific badges
+.badge-users {
+    background-color: #e0e7ff;
+    color: #4338ca;
+}
+
+.badge-clients {
+    background-color: #fef3c7;
+    color: #92400e;
+}
+
+.badge-projects {
+    background-color: #dcfce7;
+    color: #166534;
+}
+
+.badge-tasks {
+    background-color: #f3e8ff;
+    color: #6b21a8;
+}
+
+// Status/Priority (reusing some concepts but making them generic)
+.badge-high {
+    background-color: #fee2e2;
+    color: #991b1b;
+}
+
+.badge-medium {
+    background-color: #fef3c7;
+    color: #92400e;
+}
+
+.badge-low {
+    background-color: #ecfdf5;
+    color: #065f46;
+}

@@ -1,0 +1,56 @@
+@use '../abstracts/token';
+
+// Dropdown menu component styles
+.project-dropdown {
+    position: relative;
+}
+
+.dropdown-menu-custom {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    background: white;
+    border: 1px solid token.$gray-200;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    min-width: 180px;
+    z-index: 1000;
+    display: none;
+    margin-top: 5px;
+
+    &.show {
+        display: block;
+    }
+
+    a {
+        display: flex;
+        align-items: center;
+        padding: 10px 16px;
+        color: token.$gray-700;
+        text-decoration: none;
+        transition: background-color 0.2s;
+
+        &:hover {
+            background-color: token.$gray-50;
+        }
+
+        i {
+            width: 20px;
+            margin-right: 8px;
+        }
+
+        &.text-danger {
+            color: token.$clr-red;
+
+            &:hover {
+                background-color: token.$clr-red-light;
+            }
+        }
+    }
+
+    hr {
+        margin: 4px 0;
+        border: none;
+        border-top: 1px solid token.$gray-200;
+    }
+}

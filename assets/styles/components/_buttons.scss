@@ -1,0 +1,27 @@
+@use '../abstracts/token';
+@use '../abstracts/mixins';
+
+.btn-primary {
+    @include mixins.btn;
+}
+
+.btn-accent {
+    @include mixins.btn(token.$clr_accent, token.$black);
+}
+
+.btn-info {
+    @include mixins.btn(#17a2b8, token.$white);
+}
+
+.btn-warning {
+    @include mixins.btn(#ffc107, #212529);
+}
+
+.btn-danger {
+    @include mixins.btn(#dc3545, token.$white);
+}
+
+.btn-sm {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+}

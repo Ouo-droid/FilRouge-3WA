@@ -1,0 +1,246 @@
+@use '../abstracts/token';
+@use '../abstracts/mixins';
+
+.settings-page {
+    .settings-header {
+        margin-bottom: 1.5rem;
+
+        h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: token.$black;
+            margin-bottom: 0.25rem;
+        }
+
+        p {
+            font-size: 0.875rem;
+            color: token.$gray-500;
+            margin-bottom: 0;
+        }
+    }
+
+    .settings-tabs {
+        background-color: token.$gray-100;
+        display: inline-flex;
+        padding: 4px;
+        border-radius: 10px;
+        margin-bottom: 1.5rem;
+        border: none;
+
+        .nav-item {
+            .nav-link {
+                color: token.$gray-500;
+                font-weight: 500;
+                font-size: 0.875rem;
+                padding: 8px 16px;
+                border-radius: 7px;
+                border: none;
+                transition: all 0.2s ease;
+                display: flex;
+                align-items: center;
+
+                i {
+                    font-size: 0.9rem;
+                }
+
+                &.active {
+                    background-color: token.$white;
+                    color: token.$black;
+                    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+                }
+
+                &:hover:not(.active) {
+                    background-color: rgba(token.$white, 0.5);
+                    color: token.$black;
+                }
+            }
+        }
+    }
+
+    .settings-card {
+        background: token.$white;
+        border: 1px solid token.$gray-200;
+        border-radius: 12px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+
+        .card-body {
+            padding: 1.5rem;
+        }
+
+    }
+
+    .settings-avatar-section {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 1.5rem;
+        gap: 0.75rem;
+
+        .settings-avatar-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: token.$black;
+            margin: 0;
+        }
+
+        .settings-avatar {
+            width: 70px;
+            height: 70px;
+            background: linear-gradient(135deg, lighten(#eff6ff, 2%) 0%, #dbeafe 100%);
+            color: #2563eb;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            font-weight: 600;
+            border-radius: 50%;
+            border: 2px solid token.$white;
+            box-shadow: 0 0 0 1px token.$gray-200;
+        }
+
+        .avatar-actions {
+            .btn-change {
+                @include mixins.btn(token.$white, token.$gray-700);
+                border: 1px solid token.$gray-200;
+                font-size: 0.8125rem;
+                font-weight: 500;
+                padding: 6px 14px;
+                border-radius: 6px;
+                margin-bottom: 4px;
+
+                &:hover {
+                    background-color: token.$gray-50;
+                    border-color: token.$gray-300;
+                }
+            }
+
+            p {
+                font-size: 0.75rem;
+                color: token.$gray-400;
+                margin-bottom: 0;
+            }
+        }
+    }
+
+    .form-label {
+        font-size: 0.8125rem;
+        font-weight: 600;
+        color: token.$gray-600;
+        margin-bottom: 0.5rem;
+    }
+
+    .form-control {
+        font-size: 0.875rem;
+        padding: 0.625rem 0.875rem;
+        border-radius: 8px;
+        border: 1px solid token.$gray-200;
+        background-color: token.$gray-50;
+        transition: border-color 0.2s, box-shadow 0.2s;
+
+        &:focus {
+            border-color: token.$clr-blue;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+            background-color: token.$white;
+        }
+
+        &:read-only {
+            background-color: token.$gray-100;
+            color: token.$gray-500;
+            cursor: not-allowed;
+            border-color: token.$gray-200;
+        }
+    }
+
+    .btn-save {
+        @include mixins.btn(#2563eb, token.$white);
+        font-size: 0.875rem;
+        font-weight: 600;
+        padding: 10px 20px;
+        border-radius: 8px;
+
+        i {
+            font-size: 0.9rem;
+        }
+    }
+}
+
+// ── Degree / Certifications UI ────────────────────────────────────────────
+.degree-add-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: stretch;
+
+    .form-control { flex: 1; min-width: 0; }
+}
+
+.btn-degree-add {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 0.9rem;
+    background: #2563eb;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background 0.15s;
+    flex-shrink: 0;
+
+    &:hover { background: #1d4ed8; }
+}
+
+.degree-list {
+    list-style: none;
+    margin: 0.6rem 0 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.degree-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 0.75rem;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    color: #334155;
+
+    .degree-text { flex: 1; }
+
+    .degree-actions {
+        display: flex;
+        gap: 0.4rem;
+        margin-left: 0.75rem;
+    }
+}
+
+.degree-btn-edit,
+.degree-btn-delete {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    background: #fff;
+    cursor: pointer;
+    font-size: 0.75rem;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.degree-btn-edit {
+    color: #2563eb;
+    &:hover { background: #2563eb; color: #fff; border-color: #2563eb; }
+}
+
+.degree-btn-delete {
+    color: #ef4444;
+    &:hover { background: #ef4444; color: #fff; border-color: #ef4444; }
+}

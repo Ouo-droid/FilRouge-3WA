@@ -1,0 +1,34 @@
+@use '../abstracts/token';
+
+@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap");
+
+body {
+    background-color: #F2F5FF;
+    color: token.$gray-800;
+    font-family: token.$font-primary;
+    font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+h1,
+.h-xxl {
+    font-weight: 700;
+    margin-bottom: 1.5rem;
+}
+
+h2,
+.h-xl {
+    font-weight: 600;
+    margin-bottom: 1.25rem;
+}
+
+h3,
+.h-l {
+    font-weight: 600;
+    margin-bottom: 1rem;
+}
+
+p {
+    margin-bottom: 1rem;
+}

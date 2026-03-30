@@ -1,0 +1,10 @@
+import "bootstrap/scss/bootstrap.scss";
+import "./styles/styles.scss";
+import "./ts/viewUsers";
+import "./ts/settings";
+import "./ts/pages/home";
+import "./ts/pages/clients";
+import "./ts/pages/projects";
+import "./ts/pages/tasks";
+import "./ts/pages/viewProject";
+import "./ts/pages/login";

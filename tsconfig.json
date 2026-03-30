@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "outDir": "./dist/",
+    "sourceMap": true,
+    "strict": true,
+    "module": "es6",
+    "moduleResolution": "node",
+    "target": "es5",
+    "allowJs": true
+  },
+  "include": [
+    "assets/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "tests",
+    "playwright.config.ts"
+  ]
+}

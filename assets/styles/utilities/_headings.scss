@@ -1,0 +1,19 @@
+@use 'sass:list';
+
+$heading-sizes: xs, s, m, l, xl, xxl;
+
+@for $i from 1 through list.length($heading-sizes) {
+    .h-#{list.nth($heading-sizes, $i)} {
+        $remSize: 0.5 + calc($i / 4);
+        font-size: #{$remSize}rem;
+    }
+}
+
+$status-style: à faire, en cours, terminé, bloqué, en attente;
+
+@for $i from 1 through list.length($status-style) {
+  .h-#{list.nth($status-style, $i)} {
+    $remSize: 0.5 + calc($i / 4);
+    font-size: #{$remSize}rem;
+  }
+}

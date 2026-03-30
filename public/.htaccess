@@ -1,0 +1,39 @@
+RewriteEngine On
+
+# Servir les fichiers statiques directement
+RewriteCond %{REQUEST_FILENAME} -f
+RewriteCond %{REQUEST_URI} \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ [NC]
+RewriteRule ^(.*)$ - [L]
+
+# Rediriger tout le reste vers index.php
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ index.php [QSA,L]
+
+# Headers pour les fichiers JavaScript
+<FilesMatch "\.js$">
+    Header set Content-Type "application/javascript"
+    Header set Cache-Control "public, max-age=31536000"
+</FilesMatch>
+
+# Headers pour les fichiers CSS
+<FilesMatch "\.css$">
+    Header set Content-Type "text/css"
+    Header set Cache-Control "public, max-age=31536000"
+</FilesMatch>
+
+<IfModule mod_headers.c>
+    # Content-Security-Policy is handled by PHP in index.php to support nonces
+
+    # Strict-Transport-Security (HSTS)
+    # Enforces HTTPS for 1 year, includes subdomains, and allows preloading
+    Header set Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+
+    # X-Content-Type-Options
+    # Prevents MIME-sniffing
+    Header set X-Content-Type-Options "nosniff"
+
+    # Referrer-Policy
+    # Controls referrer information sent to other sites
+    Header set Referrer-Policy "same-origin"
+</IfModule>

@@ -1,0 +1,96 @@
+@use '../abstracts/token';
+
+.appbar {
+    background: token.$white;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    padding: 15px 30px;
+    border-radius: 12px;
+    margin-top: 15px; // slightly down
+    margin-bottom: 30px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
+
+    .appbar-content {
+        display: flex;
+        align-items: center;
+    }
+
+    .appbar-avatar {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: token.$white;
+        font-size: 24px;
+        font-weight: bold;
+    }
+
+    .appbar-info {
+        .appbar-username {
+            color: token.$clr_primary;
+            margin-bottom: 2px;
+            font-weight: 600;
+            font-size: 1.5rem;
+        }
+
+        p {
+            color: token.$gray-600;
+            margin: 0;
+            font-size: 0.95rem;
+        }
+    }
+
+    .appbar-role-badge {
+        display: inline-block;
+        padding: 2px 10px;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 500;
+        border: 1.5px solid;
+        line-height: 1.6;
+
+        &.appbar-role-admin {
+            color: token.$clr-indigo;
+            background: #eef2ff;
+            border-color: #c7d2fe;
+        }
+        &.appbar-role-pdg {
+            color: #7c3aed;
+            background: #f5f3ff;
+            border-color: #ddd6fe;
+        }
+        &.appbar-role-cdp {
+            color: #0891b2;
+            background: #ecfeff;
+            border-color: #a5f3fc;
+        }
+        &.appbar-role-user {
+            color: #059669;
+            background: #ecfdf5;
+            border-color: #a7f3d0;
+        }
+    }
+
+    @media (max-width: 991.98px) {
+        padding: 15px;
+        margin-bottom: 20px;
+
+        .appbar-avatar {
+            width: 50px;
+            height: 50px;
+            font-size: 20px;
+        }
+
+        .appbar-info {
+            .appbar-username {
+                font-size: 1.25rem;
+            }
+            p {
+                font-size: 0.85rem;
+            }
+        }
+    }
+}

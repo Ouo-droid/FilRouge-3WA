@@ -1,0 +1,196 @@
+@use '../abstracts/token';
+
+.login-page {
+    min-height: 100vh;
+    background-color: #e8edf6;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-family: token.$font-primary;
+    position: relative;
+}
+
+.login-logo {
+    position: absolute;
+    top: 30px;
+    left: 40px;
+    display: flex;
+    align-items: center;
+    color: token.$clr-indigo-dark;
+    font-size: 1.5rem;
+    font-weight: 700;
+
+    i {
+        font-size: 1.8rem;
+    }
+}
+
+.login-card {
+    background: token.$white;
+    border-radius: 16px;
+    padding: 48px 48px 56px;
+    width: 100%;
+    max-width: 480px;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+}
+
+.login-welcome {
+    font-size: 1.25rem;
+    font-weight: 400;
+    color: token.$gray-700;
+    margin-bottom: 4px;
+}
+
+.login-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: token.$black;
+    margin-bottom: 32px;
+}
+
+.login-error {
+    background-color: token.$clr-red-light;
+    color: token.$clr-red;
+    padding: 10px 16px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    font-size: 0.875rem;
+}
+
+.login-field {
+    margin-bottom: 20px;
+
+    label {
+        display: block;
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: token.$gray-700;
+        margin-bottom: 8px;
+    }
+
+    input {
+        width: 100%;
+        padding: 12px 16px;
+        border: 1px solid token.$gray-200;
+        border-radius: 10px;
+        font-size: 0.875rem;
+        font-family: token.$font-primary;
+        color: token.$gray-800;
+        background: token.$white;
+        transition: border-color 0.2s, box-shadow 0.2s;
+
+        &::placeholder {
+            color: token.$gray-400;
+        }
+
+        &:focus {
+            outline: none;
+            border-color: token.$clr-indigo-dark;
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        }
+    }
+}
+
+.login-password-wrapper {
+    position: relative;
+
+    input {
+        padding-right: 48px;
+    }
+}
+
+.login-toggle-password {
+    position: absolute;
+    right: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: token.$gray-400;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s;
+
+    &:hover {
+        color: token.$gray-600;
+    }
+}
+
+.login-options {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+}
+
+.login-remember {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-size: 0.875rem;
+    color: token.$gray-600;
+
+    input[type="checkbox"] {
+        width: 16px;
+        height: 16px;
+        accent-color: token.$clr-indigo-dark;
+        cursor: pointer;
+    }
+}
+
+.login-forgot {
+    font-size: 0.875rem;
+    color: token.$clr-indigo-dark;
+    text-decoration: none;
+    transition: color 0.2s;
+
+    &:hover {
+        color: #4338ca;
+        text-decoration: underline;
+    }
+}
+
+.login-select {
+    width: 100%;
+    padding: 12px 16px;
+    border: 1px solid token.$gray-200;
+    border-radius: 10px;
+    font-size: 0.875rem;
+    font-family: token.$font-primary;
+    color: token.$gray-800;
+    background: token.$white;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2394a3b8' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 16px center;
+    cursor: pointer;
+    transition: border-color 0.2s, box-shadow 0.2s;
+
+    &:focus {
+        outline: none;
+        border-color: token.$clr-indigo-dark;
+        box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+    }
+}
+
+.login-submit {
+    width: 100%;
+    padding: 14px;
+    background-color: token.$clr-indigo;
+    color: token.$white;
+    border: none;
+    border-radius: 10px;
+    font-size: 1rem;
+    font-weight: 600;
+    font-family: token.$font-primary;
+    cursor: pointer;
+    transition: background-color 0.2s;
+
+    &:hover {
+        background-color: token.$clr-indigo-dark;
+    }
+}

@@ -1,0 +1,141 @@
+name: CI/CD avec Playwright
+
+on:
+  push:
+    branches: [ main, dev-seb, dev-yvan ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: fil_rouge_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+
+    steps:
+      - name: Checkout du code
+        uses: actions/checkout@v4
+
+      # Configuration PHP
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: pdo, pdo_mysql, mbstring
+          coverage: none
+
+      # Installation des dépendances PHP
+      - name: Installation Composer
+        run: composer install --no-interaction --prefer-dist --optimize-autoloader
+
+      # Configuration Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      # Installation des dépendances Node
+      - name: Installation des dépendances npm
+        run: npm ci
+
+      # Build des assets (TypeScript + SCSS)
+      - name: Build des assets
+        run: npm run build
+
+      # Configuration de l'environnement
+      - name: Créer le fichier .env
+        run: |
+          cat > .env << EOF
+          DSN=mysql:host=127.0.0.1;dbname=fil_rouge_test
+          USERNAME=root
+          PASSWORD=root
+          CONTROLLER_NAMESPACE=Kentec\App\Controller\\
+          MODEL_NAMESPACE=Kentec\App\Model\\
+          DEBUG=true
+          EOF
+
+      # Import de la base de données
+      - name: Import du schéma de base de données
+        run: |
+          mysql -h 127.0.0.1 -uroot -proot fil_rouge_test < fil_rouge.sql
+
+      # Démarrage du serveur PHP en arrière-plan
+      - name: Démarrer le serveur PHP
+        run: |
+          php -S localhost:8000 -t public &
+          sleep 5
+          curl http://localhost:8000 || exit 1
+
+      # Installation de Playwright
+      - name: Installation de Playwright
+        run: npx playwright install --with-deps chromium
+
+      # Exécution des tests Playwright
+      - name: Exécution des tests E2E
+        run: npx playwright test
+        env:
+          CI: true
+          BASE_URL: http://localhost:8000
+
+      # Upload des rapports de test
+      - name: Upload du rapport Playwright
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 30
+
+      # Upload des traces en cas d'échec
+      - name: Upload des traces en cas d'échec
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-traces
+          path: test-results/
+          retention-days: 30
+
+      # Upload des screenshots
+      - name: Upload des screenshots
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: screenshots
+          path: test-results/**/*.png
+          retention-days: 7
+
+  # Job pour publier le rapport sur GitHub Pages
+  publish-report:
+    needs: build-and-test
+    if: always() && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report
+
+      - name: Publish to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./playwright-report
+          destination_dir: reports/${{ github.run_number }}

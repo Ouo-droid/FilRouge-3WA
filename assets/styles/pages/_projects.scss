@@ -1,0 +1,598 @@
+// _projects.scss
+@use '../abstracts/token';
+
+// ==========================================
+// Toast Notifications — Projets
+// Style distinct des tâches : teinte indigo
+// pour le succès, rouge pour l'erreur.
+// ==========================================
+.project-toast {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.875rem 1.25rem;
+    border-radius: 10px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+    font-size: 0.9375rem;
+    font-weight: 500;
+    z-index: 9999;
+    transform: translateY(1.5rem);
+    opacity: 0;
+    transition: transform 0.3s ease, opacity 0.3s ease;
+    min-width: 260px;
+    max-width: 420px;
+
+    // Décalage vertical si un toast tâche est déjà présent
+    // (les deux s'empilent proprement grâce à bottom offset)
+    &:not(:last-child) {
+        bottom: 5.5rem;
+    }
+
+    i {
+        font-size: 1.125rem;
+        flex-shrink: 0;
+    }
+
+    &--visible {
+        transform: translateY(0);
+        opacity: 1;
+    }
+
+    // Succès — teinte indigo/bleu (≠ vert des tâches)
+    &--success {
+        background: #eef2ff;
+        color: #3730a3;
+        border: 1px solid #c7d2fe;
+
+        i {
+            color: token.$clr-indigo-dark;
+        }
+    }
+
+    // Erreur — rouge (cohérent avec les tâches)
+    &--error {
+        background: token.$clr-red-light;
+        color: #991b1b;
+        border: 1px solid #fecaca;
+
+        i {
+            color: token.$clr-red;
+        }
+    }
+}
+
+// ==========================================
+// Modale de confirmation de suppression
+// ==========================================
+.project-confirm-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    backdrop-filter: blur(2px);
+
+    &--visible {
+        opacity: 1;
+    }
+
+    .project-confirm-box {
+        background: white;
+        border-radius: 16px;
+        padding: 2rem;
+        max-width: 420px;
+        width: 90%;
+        text-align: center;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+        transform: scale(0.95);
+        transition: transform 0.2s ease;
+
+        .project-confirm-overlay--visible & {
+            transform: scale(1);
+        }
+
+        .project-confirm-icon {
+            width: 56px;
+            height: 56px;
+            background: token.$clr-red-light;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1.25rem;
+
+            i {
+                font-size: 1.5rem;
+                color: token.$clr-red;
+            }
+        }
+
+        h3 {
+            font-size: 1.125rem;
+            font-weight: 700;
+            color: token.$clr-text;
+            margin-bottom: 0.5rem;
+        }
+
+        p {
+            color: token.$gray-500;
+            font-size: 0.9375rem;
+            line-height: 1.6;
+            margin-bottom: 1.75rem;
+
+            strong {
+                color: token.$clr-text;
+            }
+        }
+
+        .project-confirm-actions {
+            display: flex;
+            gap: 0.75rem;
+            justify-content: center;
+
+            button {
+                padding: 0.625rem 1.5rem;
+                border-radius: 8px;
+                font-size: 0.9375rem;
+                font-weight: 600;
+                cursor: pointer;
+                border: none;
+                transition: all 0.15s ease;
+            }
+
+            .project-confirm-cancel {
+                background: token.$gray-100;
+                color: token.$gray-600;
+
+                &:hover {
+                    background: token.$gray-200;
+                    color: token.$clr-text;
+                }
+            }
+
+            .project-confirm-delete {
+                background: token.$clr-red;
+                color: white;
+
+                &:hover {
+                    background: #b91c1c;
+                    transform: translateY(-1px);
+                    box-shadow: 0 4px 12px rgba(220, 38, 38, 0.35);
+                }
+
+                &:active {
+                    transform: translateY(0);
+                }
+            }
+        }
+    }
+}
+
+// ==========================================
+// Page Projets — layout inspiré des Tâches
+// ==========================================
+.projects-page {
+    padding: 2rem;
+    padding-top: 1.5rem;
+
+    .page-header {
+        background: transparent !important;
+        box-shadow: none !important;
+        border-radius: 0 !important;
+        border: none !important;
+        padding: 0 !important;
+        margin-bottom: 1.75rem;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 0.25rem;
+
+        h1 {
+            font-size: 1.625rem;
+            font-weight: 700;
+            color: #1e293b;
+            margin: 0;
+
+            i { color: token.$clr-indigo; font-size: 1.375rem; }
+        }
+
+        p {
+            color: token.$gray-400;
+            font-size: 0.9rem;
+            margin: 0;
+        }
+    }
+
+    // Stats Grid (identique à tasks)
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+
+        .stat-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border: 1px solid token.$gray-200;
+
+            .stat-info {
+                .stat-label {
+                    color: token.$gray-500;
+                    font-size: 0.875rem;
+                    margin-bottom: 0.5rem;
+                }
+                .stat-value {
+                    font-size: 1.875rem;
+                    font-weight: 700;
+                    color: token.$clr-text;
+                }
+            }
+
+            .stat-icon {
+                width: 40px;
+                height: 40px;
+                border-radius: 8px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 1.25rem;
+
+                &.blue   { background: #eff6ff; color: #3b82f6; }
+                &.green  { background: #f0fdf4; color: token.$clr-green; }
+                &.orange { background: #fff7ed; color: #f97316; }
+                &.purple { background: #f3e8ff; color: #a855f7; }
+                &.red    { background: token.$clr-red-light; color: #ef4444; }
+            }
+        }
+    }
+
+    // Filter tabs (identique à tasks)
+    .task-filters {
+        display: flex;
+        gap: 0.5rem;
+        background: token.$gray-100;
+        padding: 0.5rem;
+        border-radius: 9999px;
+        width: fit-content;
+        margin-bottom: 1.5rem;
+        flex-wrap: wrap;
+
+        .filter-btn {
+            background: none;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 9999px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: token.$gray-500;
+            cursor: pointer;
+            transition: all 0.2s;
+
+            &:hover { color: token.$clr-text; }
+
+            &.active {
+                background: white;
+                color: token.$clr-text;
+                font-weight: 600;
+                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            }
+        }
+    }
+
+    // Actions Bar
+    .actions-bar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+        background: white;
+        padding: 1rem;
+        border-radius: 12px;
+        border: 1px solid token.$gray-200;
+
+        .search-container {
+            position: relative;
+            width: 100%;
+            max-width: 400px;
+
+            i {
+                position: absolute;
+                left: 1rem;
+                top: 50%;
+                transform: translateY(-50%);
+                color: token.$gray-400;
+            }
+
+            input {
+                width: 100%;
+                padding: 0.75rem 1rem 0.75rem 2.5rem;
+                border: 1px solid token.$gray-300;
+                border-radius: 8px;
+                background: token.$gray-50;
+
+                &:focus {
+                    outline: none;
+                    border-color: token.$clr-indigo;
+                    background: white;
+                }
+            }
+        }
+
+        .btn-new-project {
+            background: token.$clr-indigo;
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            border: none;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            cursor: pointer;
+            transition: background 0.2s;
+            white-space: nowrap;
+
+            &:hover { background: token.$clr-indigo-dark; }
+        }
+    }
+
+    // Projects List
+    .projects-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+
+        .no-projects {
+            background: white;
+            border-radius: 12px;
+            border: 1px solid token.$gray-200;
+            padding: 3rem;
+        }
+
+        .project-card {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 0.875rem 1.25rem;
+            background: white;
+            border-radius: 12px;
+            border: 1px solid token.$gray-200;
+            transition: box-shadow 0.2s;
+
+            &:hover { box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+
+            // Icône
+            &__icon {
+                flex-shrink: 0;
+                width: 36px;
+                height: 36px;
+                border-radius: 8px;
+                background: #eef2ff;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 1rem;
+                color: token.$clr-indigo;
+            }
+
+            // Nom + description
+            &__main {
+                flex: 0 0 220px;
+                min-width: 0;
+            }
+
+            &__name {
+                font-size: 0.9375rem;
+                font-weight: 600;
+                color: token.$clr-text;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            &__desc {
+                font-size: 0.8rem;
+                color: token.$gray-400;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            // Badges
+            &__badges {
+                flex: 0 0 auto;
+                display: flex;
+                flex-wrap: wrap;
+                align-items: center;
+                gap: 0.5rem;
+            }
+
+            &__meta {
+                font-size: 0.8rem;
+                color: token.$gray-600;
+                white-space: nowrap;
+            }
+
+            // Barre de progression
+            &__progress-bar {
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 3px;
+
+                .pc-prog-track {
+                    width: 100%;
+                    max-width: 180px;
+                    height: 6px;
+                    background: token.$gray-200;
+                    border-radius: 999px;
+                    overflow: hidden;
+                }
+
+                .pc-prog-fill {
+                    height: 100%;
+                    border-radius: 999px;
+                    transition: width 0.4s ease;
+
+                    &--success { background: token.$clr-green; }
+                    &--warning { background: #f59e0b; }
+                    &--danger  { background: #ef4444; }
+                }
+
+                .pc-prog-label {
+                    font-size: 0.72rem;
+                    font-weight: 600;
+                    color: token.$gray-500;
+                    text-align: center;
+                }
+            }
+
+            // Tâches + participants
+            &__progress {
+                display: flex;
+                align-items: center;
+                gap: 0.75rem;
+                flex-shrink: 0;
+                font-size: 0.8125rem;
+                color: token.$gray-600;
+
+                .time-item {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.3rem;
+                    white-space: nowrap;
+
+                    strong { color: token.$clr-text; font-weight: 600; }
+                }
+            }
+
+            // Échéance
+            &__deadline {
+                flex-shrink: 0;
+                font-size: 0.8rem;
+                color: token.$gray-400;
+                white-space: nowrap;
+            }
+
+            // Actions
+            &__actions {
+                flex-shrink: 0;
+                display: flex;
+                align-items: center;
+                gap: 0.375rem;
+            }
+        }
+    }
+}
+
+// Boutons d'action icône seule (Consulter / Modifier / Supprimer)
+.pc-action-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: 1px solid token.$gray-200;
+    background: white;
+    color: token.$gray-500;
+    font-size: 0.8125rem;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+    position: relative;
+
+    &:hover {
+        background: token.$gray-100;
+        color: token.$clr-text;
+        border-color: token.$gray-400;
+    }
+
+    &--edit {
+        color: token.$clr-indigo;
+        border-color: #c7d2fe;
+        background: #eef2ff;
+
+        &:hover {
+            background: #e0e7ff;
+            color: #4338ca;
+            border-color: #a5b4fc;
+        }
+    }
+
+    &--delete {
+        color: token.$clr-red;
+        border-color: #fecaca;
+        background: token.$clr-red-light;
+
+        &:hover {
+            background: #fee2e2;
+            color: #b91c1c;
+            border-color: #fca5a5;
+        }
+    }
+}
+
+// Responsive
+@media (max-width: 1200px) {
+    .projects-page .projects-list .project-card {
+        &__main { flex: 0 0 160px; }
+    }
+}
+
+@media (max-width: 992px) {
+    .projects-page .projects-list .project-card {
+        flex-wrap: wrap;
+        gap: 0.5rem;
+
+        // Ligne 1 : icône + nom
+        &__icon { flex-shrink: 0; }
+        &__main { flex: 1 1 auto; min-width: 0; }
+
+        // Ligne 2 : badges (état + manager) sur toute la largeur
+        &__badges {
+            flex: 1 1 100%;
+            padding-left: calc(36px + 1rem); // aligne avec le texte du nom
+        }
+
+        // Ligne 3 : barre de progression pleine largeur
+        &__progress-bar {
+            flex: 1 1 100%;
+            width: 100%;
+            max-width: 100%;
+            padding-left: calc(36px + 1rem);
+            align-items: flex-start;
+
+            .pc-prog-track { max-width: 100%; }
+            .pc-prog-label { text-align: left; }
+        }
+
+        // Ligne 4 : tâches + échéance + actions sur la même ligne
+        &__progress  { flex: 1 1 auto; padding-left: calc(36px + 1rem); }
+        &__deadline  { flex: 0 0 auto; }
+        &__actions   { flex: 0 0 auto; margin-left: auto; }
+    }
+}
+
+@media (max-width: 576px) {
+    .projects-page .projects-list .project-card {
+        &__badges   { padding-left: 0; }
+        &__progress-bar { padding-left: 0; }
+        &__progress { padding-left: 0; flex: 1 1 100%; }
+        &__deadline { flex: 1 1 100%; }
+        &__actions  { flex: 1 1 100%; justify-content: flex-end; }
+    }
+}

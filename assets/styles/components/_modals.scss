@@ -1,0 +1,338 @@
+@use '../abstracts/token';
+
+// ==========================================
+// Form Overlay & Edit Modal
+// ==========================================
+
+// Alias used by team.php, project/details.php and other views
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.5);
+    backdrop-filter: blur(4px);
+    z-index: 1050;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+}
+
+.modal-box {
+    background: token.$gray-50;
+    border-radius: 16px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.2);
+    display: flex;
+    flex-direction: column;
+
+    .modal-header {
+        padding: 1.25rem 1.25rem 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-bottom: 1px solid token.$gray-200;
+    }
+}
+
+.form-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.5);
+    backdrop-filter: blur(4px);
+    z-index: 1050;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+}
+
+.edit-form {
+    background: token.$gray-50;
+    border-radius: 16px;
+    width: 100%;
+    max-width: 620px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.2);
+    display: flex;
+    flex-direction: column;
+}
+
+// ── Header ────────────────────────────────
+.form-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem 1.75rem;
+    background: linear-gradient(135deg, token.$clr-indigo 0%, #7c3aed 100%);
+    border-radius: 16px 16px 0 0;
+    flex-shrink: 0;
+
+    h3 {
+        margin: 0;
+        font-size: 1.125rem;
+        font-weight: 700;
+        color: white;
+        letter-spacing: -0.01em;
+    }
+}
+
+.btn-close {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: white;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 1.125rem;
+    line-height: 1;
+    transition: background 0.15s;
+
+    &:hover {
+        background: rgba(255, 255, 255, 0.35);
+    }
+}
+
+// ── Form Content ──────────────────────────
+.form-content {
+    padding: 1.25rem 1.25rem 0.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+// ── Sections ──────────────────────────────
+.form-section {
+    background: white;
+    border-radius: 12px;
+    border: 1px solid token.$gray-200;
+    overflow: hidden;
+
+    &__header {
+        display: flex;
+        align-items: center;
+        gap: 0.625rem;
+        padding: 0.75rem 1rem;
+        font-size: 0.8125rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+    }
+
+    &__icon {
+        width: 26px;
+        height: 26px;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.75rem;
+        flex-shrink: 0;
+    }
+
+    &__body {
+        padding: 0.875rem 1rem 1rem;
+        border-top: 1px solid;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    // Entreprise — indigo
+    &--company {
+        border-color: #c7d2fe;
+
+        .form-section__header {
+            background: #eef2ff;
+            color: #4338ca;
+        }
+        .form-section__icon {
+            background: #c7d2fe;
+            color: #4338ca;
+        }
+        .form-section__body {
+            border-color: #c7d2fe;
+        }
+    }
+
+    // Contact — violet
+    &--contact {
+        border-color: #ddd6fe;
+
+        .form-section__header {
+            background: #f5f3ff;
+            color: #6d28d9;
+        }
+        .form-section__icon {
+            background: #ddd6fe;
+            color: #6d28d9;
+        }
+        .form-section__body {
+            border-color: #ddd6fe;
+        }
+    }
+
+    // Aliases — indigo (identification, info)
+    &--identification { @extend .form-section--company; }
+    &--info           { @extend .form-section--company; }
+
+    // Aliases — violet (catégorisation, équipe)
+    &--categorisation { @extend .form-section--contact; }
+    &--team           { @extend .form-section--contact; }
+
+    // Alias — bleu (planning)
+    &--planning { @extend .form-section--address; }
+
+    // Assignation — teal
+    &--assignation {
+        border-color: #99f6e4;
+
+        .form-section__header { background: #f0fdfa; color: #0f766e; }
+        .form-section__icon   { background: #99f6e4; color: #0f766e; }
+        .form-section__body   { border-color: #99f6e4; }
+    }
+
+    // Clôture — orange
+    &--closure {
+        border-color: #fed7aa;
+
+        .form-section__header { background: #fff7ed; color: #c2410c; }
+        .form-section__icon   { background: #fed7aa; color: #c2410c; }
+        .form-section__body   { border-color: #fed7aa; }
+    }
+
+    // Adresse — bleu
+    &--address {
+        border-color: #bfdbfe;
+
+        .form-section__header {
+            background: #eff6ff;
+            color: #1d4ed8;
+        }
+        .form-section__icon {
+            background: #bfdbfe;
+            color: #1d4ed8;
+        }
+        .form-section__body {
+            border-color: #bfdbfe;
+        }
+    }
+}
+
+// ── Form Group ────────────────────────────
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+
+    label {
+        font-size: 0.8125rem;
+        font-weight: 600;
+        color: #374151;
+    }
+
+    input,
+    select,
+    textarea {
+        width: 100%;
+        padding: 0.625rem 0.75rem;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        font-size: 0.875rem;
+        color: #0f172a;
+        background: #fff;
+        transition: border-color 0.15s, box-shadow 0.15s;
+
+        &:focus {
+            outline: none;
+            border-color: token.$clr-indigo;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+        }
+
+        &.bg-light,
+        &[disabled] {
+            background: token.$gray-50;
+            color: #94a3b8;
+            cursor: not-allowed;
+        }
+
+        &::placeholder {
+            color: #cbd5e1;
+        }
+    }
+
+    small.text-muted {
+        font-size: 0.75rem;
+        color: #94a3b8;
+    }
+}
+
+// ── Form Row ──────────────────────────────
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+
+    &--address {
+        grid-template-columns: auto auto 1fr;
+    }
+}
+
+.form-group-small input {
+    min-width: 60px;
+}
+
+.form-hint {
+    font-size: 0.75rem;
+    color: #94a3b8;
+    margin-top: 0.25rem;
+}
+
+// ── Actions ───────────────────────────────
+.form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    padding: 1rem 1.25rem 1.25rem;
+    flex-shrink: 0;
+}
+
+.btn-cancel {
+    background: white;
+    color: #374151;
+    border: 1px solid #d1d5db;
+    padding: 0.625rem 1.25rem;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s;
+
+    &:hover {
+        background: #f9fafb;
+    }
+}
+
+.btn-save {
+    background: linear-gradient(135deg, token.$clr-indigo 0%, #7c3aed 100%);
+    color: white;
+    border: none;
+    padding: 0.625rem 1.5rem;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.15s, box-shadow 0.15s;
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.35);
+
+    &:hover {
+        opacity: 0.9;
+        box-shadow: 0 4px 14px rgba(99, 102, 241, 0.45);
+    }
+}

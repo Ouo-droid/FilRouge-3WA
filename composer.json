@@ -1,0 +1,33 @@
+{
+    "name": "kentec/fil-rouge",
+    "description": "Un microframework php",
+    "type": "project",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "Kentec\\App\\": "src/",
+            "Kentec\\Kernel\\": "kernel/"
+        }
+    },
+    "authors": [
+        {
+            "name": "Sébastien THOMAS",
+            "email": "74055963+SebastienThomasDEV@users.noreply.github.com"
+        }
+    ],
+    "minimum-stability": "stable",
+    "require-dev": {
+        "symfony/var-dumper": "^6.4",
+        "phpunit/phpunit": "^12.5",
+        "friendsofphp/php-cs-fixer": "^3.75"
+    },
+    "require": {
+        "vlucas/phpdotenv": "^5.6",
+        "ext-pdo": "*",
+        "zircote/swagger-php": "^6.0"
+    },
+    "scripts": {
+        "lint": "php-cs-fixer fix --dry-run --diff --allow-risky=yes",
+        "lint:fix": "php-cs-fixer fix --allow-risky=yes"
+    }
+}

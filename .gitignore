@@ -1,0 +1,8 @@
+vendor
+var
+node_modules
+.php-cs-fixer.cache
+.phpunit.cache
+server.log
+.env
+_bmad

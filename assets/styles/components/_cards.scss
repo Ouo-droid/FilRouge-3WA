@@ -1,0 +1,338 @@
+@use '../abstracts/token';
+
+// DEFAULT GRID for Tasks / Clients
+.card-grid {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)) !important;
+    gap: 20px !important;
+
+    // Grid specific for square project cards
+    &.project-grid {
+        grid-template-columns: repeat(auto-fill, minmax(260px, 1.5fr)) !important;
+        gap: 24px !important;
+    }
+}
+
+// DEFAULT CARD for Tasks / Clients
+.item-card {
+    background-color: token.$white !important;
+    border-radius: 16px !important;
+    padding: 24px !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+    transition: all 0.2s ease-in-out;
+    margin-bottom: 20px;
+    display: flex !important;
+    flex-direction: column;
+    min-height: 280px;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    position: relative;
+
+    &:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+    }
+
+    // --- STANDARD HEADER (Tasks/Clients) ---
+    .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 12px;
+        position: relative;
+
+        h3 {
+            margin: 0;
+            color: #1a1a1a;
+            font-size: 1.25rem;
+            font-weight: 600;
+            padding-right: 30px;
+            line-height: 1.4;
+        }
+
+        // Legacy generic options button
+        .more-options-btn {
+            position: absolute;
+            top: 0;
+            right: -10px;
+            background: none;
+            border: none;
+            color: #9ca3af;
+            cursor: pointer;
+            padding: 5px;
+
+            &:hover {
+                color: #4b5563;
+            }
+        }
+    }
+
+    // --- STANDARD DESCRIPTION (Tasks/Clients) ---
+    .card-description {
+        color: #6b7280;
+        font-size: 0.95rem;
+        line-height: 1.5;
+        margin-bottom: 20px;
+        flex-grow: 1;
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    // --- SPECIFIC FOR TASKS / CLIENTS (Restored) ---
+    .task-priority {
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+        margin-left: 12px;
+
+        &.priority-high {
+            background-color: #fee;
+            color: #c33;
+        }
+
+        &.priority-medium {
+            background-color: #ffeaa7;
+            color: #d63031;
+        }
+
+        &.priority-low {
+            background-color: #dfe6e9;
+            color: #636e72;
+        }
+    }
+
+    .card-meta {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-bottom: 20px;
+        flex-grow: 1;
+
+        .meta-item {
+            display: flex;
+            align-items: center;
+            font-size: 14px;
+
+            .meta-label {
+                font-weight: 600;
+                color: #333;
+                min-width: 110px;
+                display: inline-block;
+            }
+
+            .meta-value {
+                color: #666;
+            }
+        }
+    }
+
+    .card-actions {
+        display: flex;
+        gap: 8px;
+        justify-content: flex-end;
+        border-top: 1px solid #e9ecef;
+        padding-top: 16px;
+        margin-top: auto;
+        flex-shrink: 0;
+
+        button {
+            white-space: nowrap;
+            flex: 0 0 auto;
+            min-width: fit-content;
+        }
+    }
+
+    // ==========================================
+    // PROJECT CARD OVERRIDES (User's Custom Style)
+    // ==========================================
+    &.project-card {
+        padding: 20px !important;
+        justify-content: flex-start;
+        border: 1px solid #e5e7eb !important;
+        border-radius: 12px !important;
+        background-color: #fff;
+        min-height: auto;
+        display: flex;
+        flex-direction: column;
+
+        .card-header {
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+
+            h3 {
+                font-size: 1rem;
+                font-weight: 700;
+                color: #111827;
+                line-height: 1.3;
+                margin-bottom: 4px;
+            }
+
+            .more-options-btn {
+                position: static;
+                color: #9ca3af;
+                padding: 4px;
+
+                &:hover {
+                    color: #4b5563;
+                }
+            }
+        }
+
+        .card-body {
+            padding: 0;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .card-description {
+            font-size: 0.85rem;
+            color: #6b7280;
+            line-height: 1.5;
+            margin-bottom: 12px;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-bottom: 12px;
+            width: fit-content;
+
+            &.active {
+                background-color: #d1fae5;
+                color: #065f46;
+            }
+
+            &.completed {
+                background-color: #dbeafe;
+                color: #1e40af;
+            }
+
+            &.delayed {
+                background-color: #fee2e2;
+                color: #991b1b;
+            }
+        }
+
+        .progress-section {
+            margin-bottom: 12px;
+
+            .progress-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 8px;
+                font-size: 0.8rem;
+                color: #4b5563;
+
+                .percentage {
+                    color: #111827;
+                    font-weight: 600;
+                }
+            }
+
+            .progress-bar-bg {
+                width: 100%;
+                height: 8px;
+                background-color: #e5e7eb;
+                border-radius: 9999px;
+                overflow: hidden;
+
+                .progress-bar-fill {
+                    height: 100%;
+                    background-color: #111827;
+                    border-radius: 9999px;
+                    transition: width 0.5s ease-out;
+                }
+            }
+        }
+
+        .card-stats {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+            margin-bottom: 0;
+            color: #4b5563;
+            font-size: 0.8rem;
+            margin-top: auto;
+            border-top: 1px solid #f3f4f6;
+            padding-top: 12px;
+
+            .stat-item {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+
+                i {
+                    font-size: 0.9rem;
+                    color: #6b7280;
+                }
+            }
+        }
+
+        .date-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #4b5563;
+            font-size: 0.8rem;
+            margin-top: 8px;
+            margin-bottom: 12px;
+
+            i {
+                font-size: 0.9rem;
+                color: #6b7280;
+            }
+        }
+
+        .card-footer-custom {
+            margin-top: auto;
+
+            .view-project-btn {
+                background-color: #fff;
+                border: 1px solid #e5e7eb;
+                color: #111827;
+                padding: 8px 12px;
+                border-radius: 6px;
+                font-size: 0.8rem;
+                font-weight: 500;
+                cursor: pointer;
+                transition: all 0.2s;
+                width: 100%;
+                text-align: center;
+
+                &:hover {
+                    background-color: #f9fafb;
+                    border-color: #d1d5db;
+                }
+            }
+        }
+
+        // Hide standard elements not used in project card
+        .card-actions,
+        .card-meta,
+        .task-priority {
+            display: none !important;
+        }
+    }
+}
+
+// Mobile adjustments
+@media (max-width: 768px) {
+    .card-grid.project-grid {
+        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)) !important;
+    }
+}
