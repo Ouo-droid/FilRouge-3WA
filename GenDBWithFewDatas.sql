@@ -127,7 +127,7 @@ CREATE TABLE public.task (
 -- Absence
 CREATE TABLE public.absence (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
     reason VARCHAR(255),
     startdate DATE NOT NULL,
     enddate DATE NOT NULL,
@@ -137,21 +137,21 @@ CREATE TABLE public.absence (
 
 -- Tables de liaison
 CREATE TABLE public.clientaddressREL (
-    PRIMARY KEY (siret, address_id)
     siret VARCHAR(14) NOT NULL,
     address_id UUID NOT NULL,
+    PRIMARY KEY (siret, address_id)
 );
 
 CREATE TABLE public.useraddressREL (
-    PRIMARY KEY (user_id, address_id)
     user_id UUID NOT NULL,
     address_id UUID NOT NULL,
+    PRIMARY KEY (user_id, address_id)
 );
 
 CREATE TABLE public.usertaskREL (
-    PRIMARY KEY (user_id, task_id)
     user_id UUID NOT NULL,
     task_id UUID NOT NULL,
+    PRIMARY KEY (user_id, task_id)
 );
 
 -- ============================================
