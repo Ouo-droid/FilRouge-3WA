@@ -217,19 +217,3 @@ $clr-red-light:     #fef2f2;
 $clr-text:          #0f172a;
 ```
 
----
-
-## Workflow Git
-
-- La branche principale est `develop`
-- Créez une branche par fonctionnalité : `feature/nom-de-la-feature`
-- Une fois terminée, ouvrez une Pull Request vers `develop`
-- Ne poussez jamais directement sur `main`
-
-```bash
-git checkout -b feature/ma-fonctionnalite
-# ... travail ...
-git add fichier1 fichier2
-git commit -m "feat: description de la fonctionnalité"
-git push origin feature/ma-fonctionnalite
-```
