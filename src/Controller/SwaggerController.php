@@ -8,13 +8,13 @@ use Kentec\Kernel\Http\AbstractController;
 use OpenApi\Attributes as OA;
 use OpenApi\Generator;
 
-#[OA\Info(title: 'KenTec Fil-Rouge API', version: '1.0.0')]
+#[OA\Info(version: '1.0.0', title: 'KenTec Fil-Rouge API')]
 #[OA\Server(url: '/', description: 'Relative server path')]
 #[OA\SecurityScheme(
     securityScheme: 'cookieAuth',
     type: 'apiKey',
-    in: 'cookie',
-    name: 'jwt_token'
+    name: 'jwt_token',
+    in: 'cookie'
 )]
 #[OA\OpenApi(
     security: [['cookieAuth' => []]]

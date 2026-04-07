@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Kentec\App\Controller;
 
-use Kentec\App\Model\Absence;
-use Kentec\App\Model\Information;
 use Kentec\App\Model\Project;
 use Kentec\App\Model\State;
-use Kentec\App\Model\Task;
 use Kentec\App\Model\User;
+use Kentec\App\Repository\AbsenceRepository;
+use Kentec\App\Repository\InformationRepository;
+use Kentec\App\Repository\TaskRepository;
 use Kentec\Kernel\Database\Repository;
 use Kentec\Kernel\Http\AbstractController;
 use OpenApi\Attributes as OA;
@@ -51,10 +51,10 @@ class TeamController extends AbstractController
     private function buildTeamData(): array
     {
         $userRepo    = new Repository(User::class);
-        $taskRepo    = new Repository(Task::class);
+        $taskRepo    = new TaskRepository();
         $projectRepo = new Repository(Project::class);
         $stateRepo   = new Repository(State::class);
-        $infoRepo    = new Repository(Information::class);
+        $infoRepo    = new InformationRepository();
 
         // All active users
         $users = $userRepo->getByAttributes([], true, true) ?? [];
@@ -75,12 +75,7 @@ class TeamController extends AbstractController
         }
 
         // All tasks with user assignments
-        $allTasks = $taskRepo->customQuery(
-            'SELECT t.id, t.state_id, t.project_id, ut.user_id
-             FROM task t
-             INNER JOIN usertaskrel ut ON t.id = ut.task_id
-             WHERE t.isactive = true'
-        ) ?? [];
+        $allTasks = $taskRepo->findActiveWithUserAssignments();
 
         // All projects indexed by ID
         $projects     = $projectRepo->getAll() ?? [];
@@ -155,12 +150,10 @@ class TeamController extends AbstractController
         // Active absences (users absent today)
         $activeAbsenceUserIds = [];
         try {
-            $absenceRepo   = new Repository(Absence::class);
-            $activeAbsences = $absenceRepo->customQuery(
-                "SELECT user_id FROM absence WHERE CURRENT_DATE BETWEEN startdate AND enddate"
-            ) ?? [];
-            foreach ($activeAbsences as $row) {
-                $activeAbsenceUserIds[$row['user_id']] = true;
+            $absenceRepo    = new AbsenceRepository();
+            $activeAbsences = $absenceRepo->findActiveTodayUserIds();
+            foreach ($activeAbsences as $userId) {
+                $activeAbsenceUserIds[$userId] = true;
             }
         } catch (\Exception) {
             // Table may not exist yet (migration pending)
@@ -173,14 +166,7 @@ class TeamController extends AbstractController
         unset($member);
 
         // Recent activity (last 5 informations)
-        $recentActivity = $infoRepo->customQuery(
-            'SELECT i.text, i.type, i.createdat, u.firstname, u.lastname
-             FROM information i
-             LEFT JOIN users u ON i.user_id = u.id
-             WHERE i.isactive = true
-             ORDER BY i.createdat DESC
-             LIMIT 5'
-        ) ?? [];
+        $recentActivity = $infoRepo->findRecentWithUser(5);
 
         return [
             'members'          => $members,

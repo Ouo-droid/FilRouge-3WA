@@ -6,8 +6,8 @@ namespace Kentec\App\Controller;
 
 use Kentec\App\Model\Address;
 use Kentec\App\Model\Client;
-use Kentec\App\Model\ClientAddressREL;
-use Kentec\Kernel\Database\QueryBuilder;
+use Kentec\App\Repository\ClientRepository;
+use Kentec\App\Repository\ProjectRepository;
 use Kentec\Kernel\Database\Repository;
 use Kentec\Kernel\Http\AbstractController;
 use Kentec\Kernel\Security\Security;
@@ -26,7 +26,8 @@ class ClientController extends AbstractController
     )]
     final public function index(): void
     {
-        $clientRepo = new Repository(Client::class);
+        $clientRepo  = new Repository(Client::class);
+        $projectRepo = new ProjectRepository();
 
         // Récupération des clients (hydratés en objets)
         $clients = $clientRepo->getAll();
@@ -40,13 +41,7 @@ class ClientController extends AbstractController
         $clientsArray = [];
         if ($clients) {
             try {
-                $projectCountsResult = $clientRepo->customQuery('SELECT client_id, COUNT(*) as count FROM project GROUP BY client_id');
-                $projectCounts = [];
-                if (is_array($projectCountsResult)) {
-                    foreach ($projectCountsResult as $row) {
-                        $projectCounts[$row['client_id']] = $row['count'];
-                    }
-                }
+                $projectCounts = $projectRepo->findClientProjectCounts();
             } catch (\Exception $e) {
                 $projectCounts = [];
             }
@@ -151,18 +146,13 @@ class ClientController extends AbstractController
                 $clientData = $client->toArray();
 
                 // Récupérer l'adresse associée via la table de liaison
-                $addressResult = $clientRepo->customQuery(
-                    'SELECT a.* FROM address a
-                     INNER JOIN clientaddressrel r ON r.address_id = a.id
-                     WHERE r.siret = :siret
-                     LIMIT 1',
-                    [':siret' => $siret]
-                );
+                $clientSpecificRepo = new ClientRepository();
+                $addressResult      = $clientSpecificRepo->findAddressBySiret($siret);
 
-                if (!empty($addressResult[0])) {
-                    $addressData = Address::fromDatabaseArray($addressResult[0]);
+                if ($addressResult !== null) {
+                    $addressData = Address::fromDatabaseArray($addressResult);
                     $clientData['address'] = [
-                        'id' => $addressResult[0]['id'],
+                        'id' => $addressResult['id'],
                         'streetNumber' => $addressData['streetNumber'] ?? null,
                         'streetLetter' => $addressData['streetLetter'] ?? null,
                         'streetName' => $addressData['streetName'] ?? null,
@@ -218,7 +208,7 @@ class ClientController extends AbstractController
                 }
 
                 // Suppression personnalisée car la clé primaire est siret (string)
-                $clientRepo->customQuery('DELETE FROM client WHERE siret = :siret', [':siret' => $siret]);
+                (new ClientRepository())->deleteBySiret($siret);
 
                 $this->json([
                     'success' => true,
@@ -326,32 +316,14 @@ class ClientController extends AbstractController
                     $address->setCity($addressData['city']);
                     $address->setCountry($addressData['country'] ?? null);
 
-                    // Insertion de l'adresse avec RETURNING pour récupérer l'UUID généré
-                    $addressRepo = new Repository(Address::class);
-                    $dbData = $address->toDatabaseArray();
-                    $columns = implode(', ', array_keys($dbData));
-                    $placeholders = implode(', ', array_map(fn ($k) => ":$k", array_keys($dbData)));
-                    $params = [];
-                    foreach ($dbData as $k => $v) {
-                        $params[":$k"] = $v;
-                    }
+                    // Insertion de l'adresse avec récupération de l'UUID généré
+                    $clientSpecificRepo = new ClientRepository();
+                    $addressId          = $clientSpecificRepo->insertAddress($address);
 
-                    $result = $addressRepo->customQuery(
-                        "INSERT INTO address ($columns) VALUES ($placeholders) RETURNING id",
-                        $params
-                    );
-
-                    if (!empty($result[0]['id'])) {
-                        $addressId = $result[0]['id'];
-                        $addressArray = $address->toArray();
-                        $addressArray['id'] = $addressId;
-
-                        // Création de la relation client-adresse
-                        $relRepo = new Repository(ClientAddressREL::class);
-                        $relRepo->customQuery(
-                            'INSERT INTO clientaddressrel (siret, address_id) VALUES (:siret, :address_id)',
-                            [':siret' => $inputData['siret'], ':address_id' => $addressId]
-                        );
+                    if ($addressId !== null) {
+                        $addressArray        = $address->toArray();
+                        $addressArray['id']  = $addressId;
+                        $clientSpecificRepo->linkAddressToClient($inputData['siret'], $addressId);
                     }
                 }
 
@@ -451,73 +423,38 @@ class ClientController extends AbstractController
                 }
 
                 // Sauvegarde client avec requête personnalisée car la clé primaire est siret (string)
-                $dbData = $client->toDatabaseArray();
-                unset($dbData['siret']);
-
-                $setParts = [];
-                $params = [];
-                foreach ($dbData as $key => $value) {
-                    $setParts[] = "$key = :$key";
-                    $params[":$key"] = $value;
-                }
-                $params[':siret'] = $siret;
-
-                $sql = 'UPDATE client SET ' . implode(', ', $setParts) . ' WHERE siret = :siret';
-                $clientRepo->customQuery($sql, $params);
+                $clientSpecificRepo = new ClientRepository();
+                $clientSpecificRepo->updateBySiret($client, $siret);
 
                 // Mise à jour ou création de l'adresse
-                $addressData = $inputData['address'] ?? null;
+                $addressData  = $inputData['address'] ?? null;
                 $addressArray = null;
 
                 if ($addressData && !empty($addressData['streetNumber']) && !empty($addressData['streetName']) && !empty($addressData['postCode']) && !empty($addressData['city'])) {
-                    // Vérifier si une adresse existe déjà pour ce client
-                    $existingAddress = $clientRepo->customQuery(
-                        'SELECT a.id FROM address a
-                         INNER JOIN clientaddressrel r ON r.address_id = a.id
-                         WHERE r.siret = :siret
-                         LIMIT 1',
-                        [':siret' => $siret]
-                    );
+                    $existingAddressId = $clientSpecificRepo->findExistingAddressId($siret);
 
-                    $addressRepo = new Repository(Address::class);
+                    $addressFields = [
+                        'streetnumber' => (int) $addressData['streetNumber'],
+                        'streetletter' => $addressData['streetLetter'] ?? null,
+                        'streetname'   => $addressData['streetName'],
+                        'postcode'     => $addressData['postCode'],
+                        'state'        => $addressData['state'] ?? null,
+                        'city'         => $addressData['city'],
+                        'country'      => $addressData['country'] ?? null,
+                    ];
 
-                    if (!empty($existingAddress[0]['id'])) {
+                    if ($existingAddressId !== null) {
                         // Mise à jour de l'adresse existante
-                        $addressId = $existingAddress[0]['id'];
-                        $updateParts = [];
-                        $updateParams = [];
-
-                        $addressFields = [
-                            'streetnumber' => (int) $addressData['streetNumber'],
-                            'streetletter' => $addressData['streetLetter'] ?? null,
-                            'streetname' => $addressData['streetName'],
-                            'postcode' => $addressData['postCode'],
-                            'state' => $addressData['state'] ?? null,
-                            'city' => $addressData['city'],
-                            'country' => $addressData['country'] ?? null,
-                        ];
-
-                        foreach ($addressFields as $key => $value) {
-                            $updateParts[] = "$key = :$key";
-                            $updateParams[":$key"] = $value;
-                        }
-                        $updateParams[':id'] = $addressId;
-
-                        $addressRepo->customQuery(
-                            'UPDATE address SET ' . implode(', ', $updateParts) . ' WHERE id = :id',
-                            $updateParams
-                        );
-
-                        $addressArray = [
-                            'id' => $addressId,
+                        $clientSpecificRepo->updateAddress($existingAddressId, $addressFields);
+                        $addressArray = array_merge(['id' => $existingAddressId], [
                             'streetNumber' => (int) $addressData['streetNumber'],
                             'streetLetter' => $addressData['streetLetter'] ?? null,
-                            'streetName' => $addressData['streetName'],
-                            'postCode' => $addressData['postCode'],
-                            'state' => $addressData['state'] ?? null,
-                            'city' => $addressData['city'],
-                            'country' => $addressData['country'] ?? null,
-                        ];
+                            'streetName'   => $addressData['streetName'],
+                            'postCode'     => $addressData['postCode'],
+                            'state'        => $addressData['state'] ?? null,
+                            'city'         => $addressData['city'],
+                            'country'      => $addressData['country'] ?? null,
+                        ]);
                     } else {
                         // Créer une nouvelle adresse
                         $address = new Address();
@@ -529,30 +466,11 @@ class ClientController extends AbstractController
                         $address->setCity($addressData['city']);
                         $address->setCountry($addressData['country'] ?? null);
 
-                        $addrDbData = $address->toDatabaseArray();
-                        $columns = implode(', ', array_keys($addrDbData));
-                        $placeholders = implode(', ', array_map(fn ($k) => ":$k", array_keys($addrDbData)));
-                        $addrParams = [];
-                        foreach ($addrDbData as $k => $v) {
-                            $addrParams[":$k"] = $v;
-                        }
-
-                        $result = $addressRepo->customQuery(
-                            "INSERT INTO address ($columns) VALUES ($placeholders) RETURNING id",
-                            $addrParams
-                        );
-
-                        if (!empty($result[0]['id'])) {
-                            $addressId = $result[0]['id'];
-                            $addressArray = $address->toArray();
-                            $addressArray['id'] = $addressId;
-
-                            // Création de la relation client-adresse
-                            $relRepo = new Repository(ClientAddressREL::class);
-                            $relRepo->customQuery(
-                                'INSERT INTO clientaddressrel (siret, address_id) VALUES (:siret, :address_id)',
-                                [':siret' => $siret, ':address_id' => $addressId]
-                            );
+                        $addressId = $clientSpecificRepo->insertAddress($address);
+                        if ($addressId !== null) {
+                            $addressArray        = $address->toArray();
+                            $addressArray['id']  = $addressId;
+                            $clientSpecificRepo->linkAddressToClient($siret, $addressId);
                         }
                     }
                 }
@@ -708,7 +626,7 @@ class ClientController extends AbstractController
     {
         try {
             $searchTerm = trim($_GET['q'] ?? '');
-            $clientRepo = new Repository(Client::class);
+            $clientRepo = new ClientRepository();
 
             if ($searchTerm === '') {
                 $clients     = $clientRepo->getAll();
@@ -717,15 +635,7 @@ class ClientController extends AbstractController
                 return;
             }
 
-            $queryBuilder = new QueryBuilder(Client::TABLE);
-            $queryBuilder
-                ->select(['siret', 'companyname', 'workfield', 'contactfirstname', 'contactlastname', 'contactemail', 'contactphone'])
-                ->whereEquals('isactive', 'true')
-                ->whereILike(['companyname', 'siret', 'workfield'], $searchTerm)
-                ->orderBy('companyname', 'ASC');
-
-            [$sql, $params] = $queryBuilder->build();
-            $rawRows = $clientRepo->customQuery($sql, $params);
+            $rawRows = $clientRepo->searchByTerm($searchTerm);
 
             $clientsData = array_map(function (array $row) {
                 return [

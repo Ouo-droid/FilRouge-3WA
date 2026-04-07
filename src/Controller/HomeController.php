@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace Kentec\App\Controller;
 
-use Kentec\App\Model\Absence;
-use Kentec\App\Model\Client;
-use Kentec\App\Model\Project;
 use Kentec\App\Model\State;
-use Kentec\App\Model\Task;
+use Kentec\App\Repository\ClientRepository;
 use Kentec\App\Model\User;
+use Kentec\App\Repository\AbsenceRepository;
+use Kentec\App\Repository\ProjectRepository;
+use Kentec\App\Repository\TaskRepository;
+use Kentec\App\Repository\UserRepository;
 use Kentec\Kernel\Database\Repository;
 use Kentec\Kernel\Http\AbstractController;
 use Kentec\Kernel\Security\Security;
@@ -42,9 +43,9 @@ class HomeController extends AbstractController
         $user     = $_SESSION['USER'];
         $roleName = $user->getRoleName() ?? 'USER';
 
-        $taskRepo    = new Repository(Task::class);
-        $projectRepo = new Repository(Project::class);
-        $userRepo    = new Repository(User::class);
+        $taskRepo    = new TaskRepository();
+        $projectRepo = new ProjectRepository();
+        $userRepo    = new UserRepository();
 
         $viewData = [
             'pageTitle' => 'Dashboard',
@@ -76,20 +77,15 @@ class HomeController extends AbstractController
     // ─── PDG : indicateurs stratégiques globaux ───────────────────────────────
 
     private function buildPdgData(
-        Repository $taskRepo,
-        Repository $projectRepo,
-        Repository $userRepo
+        TaskRepository $taskRepo,
+        ProjectRepository $projectRepo,
+        UserRepository $userRepo
     ): array {
-        $clientRepo = new Repository(Client::class);
+        $clientRepo = new ClientRepository();
 
-        $totalUsers = count($userRepo->customQuery('SELECT id FROM users WHERE isactive = true') ?? []);
-        $totalProjects = count($projectRepo->customQuery('SELECT id FROM project') ?? []);
-
-        $allTasks = $taskRepo->customQuery(
-            'SELECT t.id, s.name AS state_name
-             FROM task t
-             LEFT JOIN state s ON t.state_id = s.id'
-        ) ?? [];
+        $totalUsers    = $userRepo->countActive();
+        $totalProjects = $projectRepo->countAll();
+        $allTasks      = $taskRepo->findAllWithState();
 
         $totalTasks = count($allTasks);
         $completedTasks = 0;
@@ -100,30 +96,10 @@ class HomeController extends AbstractController
         }
         $completionRate = $totalTasks > 0 ? round($completedTasks / $totalTasks * 100) : 0;
 
-        $totalClients = count($clientRepo->customQuery('SELECT siret FROM client') ?? []);
-
-        // Projets en retard
-        $lateProjects = count($projectRepo->customQuery(
-            'SELECT id FROM project WHERE theoreticaldeadline < NOW() AND realdeadline IS NULL'
-        ) ?? []);
-
-        // Tâches haute priorité ouvertes
-        $highPriorityOpen = count($taskRepo->customQuery(
-            "SELECT t.id FROM task t
-             LEFT JOIN state s ON t.state_id = s.id
-             WHERE LOWER(t.priority) = 'high'
-             AND (s.name IS NULL OR (LOWER(s.name) NOT LIKE '%termin%' AND LOWER(s.name) NOT LIKE '%done%' AND LOWER(s.name) NOT LIKE '%clos%'))"
-        ) ?? []);
-
-        // Répartition par statut (top 5 états)
-        $tasksByState = $taskRepo->customQuery(
-            'SELECT s.name AS state_name, COUNT(t.id) AS cnt
-             FROM task t
-             LEFT JOIN state s ON t.state_id = s.id
-             GROUP BY s.name
-             ORDER BY cnt DESC
-             LIMIT 5'
-        ) ?? [];
+        $totalClients     = $clientRepo->countAll();
+        $lateProjects     = count($projectRepo->findLate());
+        $highPriorityOpen = count($taskRepo->findHighPriorityOpen());
+        $tasksByState     = $taskRepo->findGroupedByState(5);
 
         return [
             'kpis' => [
@@ -142,24 +118,10 @@ class HomeController extends AbstractController
 
     // ─── ADMIN : gestion des comptes ─────────────────────────────────────────
 
-    private function buildAdminData(Repository $userRepo): array
+    private function buildAdminData(UserRepository $userRepo): array
     {
-        $activeUsers = $userRepo->customQuery(
-            'SELECT u.id, u.firstname, u.lastname, u.email, u.createdat, r.name AS role_name
-             FROM users u
-             LEFT JOIN role r ON u.role_id = r.id
-             WHERE u.isactive = true
-             ORDER BY u.createdat DESC
-             LIMIT 10'
-        ) ?? [];
-
-        $userCountByRole = $userRepo->customQuery(
-            'SELECT r.name AS role_name, COUNT(u.id) AS cnt
-             FROM users u
-             LEFT JOIN role r ON u.role_id = r.id
-             WHERE u.isactive = true
-             GROUP BY r.name'
-        ) ?? [];
+        $activeUsers     = $userRepo->findRecentActiveWithRole(10);
+        $userCountByRole = $userRepo->countByRole();
 
         $totalActive = array_sum(array_column($userCountByRole, 'cnt'));
 
@@ -174,33 +136,18 @@ class HomeController extends AbstractController
 
     private static function fetchAbsentUserIds(): array
     {
-        $absenceRepo = new Repository(Absence::class);
-        $rows = $absenceRepo->customQuery(
-            "SELECT user_id FROM absence WHERE CURRENT_DATE BETWEEN startdate AND enddate"
-        ) ?? [];
-        return array_column($rows, 'user_id');
+        return (new AbsenceRepository())->findActiveTodayUserIds();
     }
 
     private function buildCdpData(
         $user,
-        Repository $taskRepo,
-        Repository $projectRepo,
-        Repository $userRepo
+        TaskRepository $taskRepo,
+        ProjectRepository $projectRepo,
+        UserRepository $userRepo
     ): array {
-        $userId = $user->getId();
+        $userId        = $user->getId();
         $absentUserIds = self::fetchAbsentUserIds();
-
-        $myProjects = $projectRepo->customQuery(
-            'SELECT p.*, COUNT(t.id) AS task_count,
-                    SUM(CASE WHEN LOWER(s.name) LIKE \'%termin%\' OR LOWER(s.name) LIKE \'%done%\' THEN 1 ELSE 0 END) AS done_count
-             FROM project p
-             LEFT JOIN task t ON t.project_id = p.id
-             LEFT JOIN state s ON t.state_id = s.id
-             WHERE p.project_manager_id = :userId
-             GROUP BY p.id
-             ORDER BY p.id DESC',
-            ['userId' => $userId]
-        ) ?? [];
+        $myProjects    = $projectRepo->findByManagerWithStats($userId);
 
         foreach ($myProjects as &$p) {
             $total = (int) $p['task_count'];
@@ -214,37 +161,13 @@ class HomeController extends AbstractController
         $urgentTasks     = [];
         $unassignedTasks = [];
         if (!empty($myProjectIds)) {
-            $placeholders = implode(',', array_fill(0, count($myProjectIds), '?'));
-            $urgentTasks  = $taskRepo->customQuery(
-                "SELECT t.*, s.name AS state_name, u.firstname AS dev_firstname, u.lastname AS dev_lastname, u.id AS dev_id
-                 FROM task t
-                 LEFT JOIN state s ON t.state_id = s.id
-                 LEFT JOIN usertaskREL ur ON ur.task_id = t.id
-                 LEFT JOIN users u ON u.id = ur.user_id
-                 WHERE t.project_id IN ($placeholders)
-                 AND (LOWER(t.priority) = 'high' OR t.theoreticalenddate <= NOW() + INTERVAL '7 days')
-                 AND (s.name IS NULL OR LOWER(s.name) NOT LIKE '%termin%')
-                 ORDER BY t.theoreticalenddate ASC
-                 LIMIT 10",
-                array_values($myProjectIds)
-            ) ?? [];
+            $urgentTasks = $taskRepo->findUrgentForProjects($myProjectIds);
             foreach ($urgentTasks as &$ut) {
                 $ut['dev_absent'] = !empty($ut['dev_id']) && in_array($ut['dev_id'], $absentUserIds, true);
             }
             unset($ut);
 
-            $unassignedTasks = $taskRepo->customQuery(
-                "SELECT t.id, t.name, t.description, t.priority, t.theoreticalenddate, t.effortrequired, s.name AS state_name, p.name AS project_name
-                 FROM task t
-                 LEFT JOIN state s ON t.state_id = s.id
-                 LEFT JOIN project p ON p.id = t.project_id
-                 LEFT JOIN usertaskREL ur ON ur.task_id = t.id
-                 WHERE t.project_id IN ($placeholders)
-                 AND ur.task_id IS NULL
-                 AND (s.name IS NULL OR LOWER(s.name) NOT LIKE '%termin%')
-                 ORDER BY t.theoreticalenddate ASC",
-                array_values($myProjectIds)
-            ) ?? [];
+            $unassignedTasks = $taskRepo->findUnassignedForProjects($myProjectIds);
         }
 
         // Stats tâches sur mes projets
@@ -269,19 +192,12 @@ class HomeController extends AbstractController
 
     private function buildUserData(
         $user,
-        Repository $taskRepo,
-        Repository $projectRepo,
-        Repository $userRepo
+        TaskRepository $taskRepo,
+        ProjectRepository $projectRepo,
+        UserRepository $userRepo
     ): array {
         $absentUserIds = self::fetchAbsentUserIds();
-        $tasks = $taskRepo->customQuery(
-            'SELECT t.*, s.name AS state_name FROM task t
-             INNER JOIN usertaskREL ut ON t.id = ut.task_id
-             LEFT JOIN state s ON t.state_id = s.id
-             WHERE ut.user_id = :userId
-             ORDER BY t.begindate DESC',
-            ['userId' => $user->getId()]
-        ) ?? [];
+        $tasks         = $taskRepo->findWithStateByUserId($user->getId());
 
         $projects    = $projectRepo->getAll() ?? [];
         $projectsById = [];
@@ -303,14 +219,8 @@ class HomeController extends AbstractController
         }
 
         // Calcul activité hebdomadaire (tâches terminées cette semaine / total assignées)
-        $weekStart = (new \DateTime())->modify('monday this week')->setTime(0, 0, 0)->format('Y-m-d H:i:s');
-        $weekTasksAll = $taskRepo->customQuery(
-            'SELECT t.id, s.name AS state_name FROM task t
-             INNER JOIN usertaskREL ut ON t.id = ut.task_id
-             LEFT JOIN state s ON t.state_id = s.id
-             WHERE ut.user_id = :userId AND t.updatedat >= :weekStart',
-            ['userId' => $user->getId(), 'weekStart' => $weekStart]
-        ) ?? [];
+        $weekStart    = (new \DateTime())->modify('monday this week')->setTime(0, 0, 0)->format('Y-m-d H:i:s');
+        $weekTasksAll = $taskRepo->findWeeklyByUserId($user->getId(), $weekStart);
         $weekDone = 0;
         foreach ($weekTasksAll as $wt) {
             if (self::isStateCompleted($wt['state_name'] ?? null)) {

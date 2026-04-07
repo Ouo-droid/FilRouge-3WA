@@ -6,6 +6,9 @@ namespace Kentec\App\Controller;
 
 use Kentec\App\Model\Role;
 use Kentec\App\Model\User;
+use Kentec\App\Repository\ProjectRepository;
+use Kentec\App\Repository\TaskRepository;
+use Kentec\App\Repository\UserRepository;
 use Kentec\Kernel\Database\Repository;
 use Kentec\Kernel\Http\AbstractController;
 use Kentec\Kernel\Security\Security;
@@ -30,22 +33,9 @@ class UsersController extends AbstractController
     )]
     final public function index(): void
     {
-        $userRepo = new Repository(User::class);
-        $rows = $userRepo->customQuery(
-            'SELECT u.*, r.name AS role_name
-             FROM users u
-             LEFT JOIN role r ON u.role_id = r.id
-             WHERE u.isactive = true
-             ORDER BY u.lastname, u.firstname'
-        ) ?? [];
-
-        $userCountByRole = $userRepo->customQuery(
-            'SELECT r.name AS role_name, COUNT(u.id) AS cnt
-             FROM users u
-             LEFT JOIN role r ON u.role_id = r.id
-             WHERE u.isactive = true
-             GROUP BY r.name'
-        ) ?? [];
+        $userRepo        = new UserRepository();
+        $rows            = $userRepo->findActiveWithRole();
+        $userCountByRole = $userRepo->countByRole();
 
         $totalActiveUsers = array_sum(array_column($userCountByRole, 'cnt'));
 
@@ -91,15 +81,8 @@ class UsersController extends AbstractController
     )]
     final public function getApiUsers(): void
     {
-        $userRepo = new Repository(User::class);
-        $rows = $userRepo->customQuery(
-            'SELECT u.*, r.name AS role_name
-             FROM users u
-             LEFT JOIN role r ON u.role_id = r.id
-             WHERE u.isactive = true
-             ORDER BY u.lastname, u.firstname'
-        ) ?? [];
-
+        $userRepo            = new UserRepository();
+        $rows                = $userRepo->findActiveWithRole();
         $utilisateursTableau = array_map(fn (array $row) => $userRepo->hydrate($row)->toArray(), $rows);
 
         $this->jsonSuccess($utilisateursTableau);
@@ -141,7 +124,6 @@ class UsersController extends AbstractController
     #[OA\Post(
         path: '/api/add/user',
         summary: 'Add new user (JSON)',
-        tags: ['Users'],
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\JsonContent(
@@ -154,6 +136,7 @@ class UsersController extends AbstractController
                 ]
             )
         ),
+        tags: ['Users'],
         responses: [
             new OA\Response(response: 201, description: 'User created'),
             new OA\Response(response: 400, description: 'Invalid input'),
@@ -295,7 +278,6 @@ class UsersController extends AbstractController
     #[OA\Post(
         path: '/api/change-password',
         summary: 'Change current user password',
-        tags: ['Users'],
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\JsonContent(
@@ -306,6 +288,7 @@ class UsersController extends AbstractController
                 ]
             )
         ),
+        tags: ['Users'],
         responses: [
             new OA\Response(response: 200, description: 'Password changed'),
             new OA\Response(response: 400, description: 'Validation error'),
@@ -378,7 +361,7 @@ class UsersController extends AbstractController
             return;
         }
 
-        $userRepo    = new Repository(User::class);
+        $userRepo = new Repository(User::class);
         $utilisateur = $userRepo->getById($userId);
 
         if ($utilisateur === null) {
@@ -396,6 +379,7 @@ class UsersController extends AbstractController
 
         // Soft delete : on désactive sans supprimer physiquement
         $utilisateur->setIsactive(false);
+        //A la place $utilisateurs->delete($utilisateur)
         $utilisateur->setUpdatedat((new \DateTime())->format('Y-m-d H:i:s'));
 
         if ($adminConnecte !== null) {
@@ -426,15 +410,17 @@ class UsersController extends AbstractController
         }
 
         try {
-            $userId = $currentUser->getId();
-            $userRepo = new Repository(User::class);
+            $userId      = $currentUser->getId();
+            $userRepo    = new UserRepository();
+            $taskRepo    = new TaskRepository();
+            $projectRepo = new ProjectRepository();
 
-            $safeQuery = function (string $query, array $params) use ($userRepo) {
+            $safe = function (callable $fn): void {
                 try {
-                    $userRepo->customQuery($query, $params);
+                    $fn();
                 } catch (\PDOException $e) {
-                    $errorCode = $e->getCode();
-                    if ($errorCode !== '42703' && $errorCode !== '42P01') {
+                    $code = $e->getCode();
+                    if ($code !== '42703' && $code !== '42P01') {
                         throw $e;
                     }
                 } catch (\Exception $e) {
@@ -444,12 +430,11 @@ class UsersController extends AbstractController
                 }
             };
 
-            $safeQuery('UPDATE project SET project_manager_id = NULL WHERE project_manager_id = :id', ['id' => $userId]);
-            $safeQuery('UPDATE project SET user_id = NULL WHERE user_id = :id', ['id' => $userId]);
-            $safeQuery('UPDATE task SET developer_id = NULL WHERE developer_id = :id', ['id' => $userId]);
-            $safeQuery('DELETE FROM usertaskrel WHERE user_id = :id', ['id' => $userId]);
-            $safeQuery('DELETE FROM useraddress WHERE user_id = :id', ['id' => $userId]);
-            $safeQuery('DELETE FROM useraddressrel WHERE user_id = :id', ['id' => $userId]);
+            $safe(fn () => $projectRepo->nullifyManagerReferences($userId));
+            $safe(fn () => $projectRepo->nullifyUserReferences($userId));
+            $safe(fn () => $taskRepo->nullifyDeveloperReferences($userId));
+            $safe(fn () => $taskRepo->deleteAllUserAssignments($userId));
+            $safe(fn () => $userRepo->deleteAddressReferences($userId));
 
             $userRepo->delete($userId);
 

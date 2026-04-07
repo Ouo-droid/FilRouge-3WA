@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace Kentec\App\Controller;
 
-use Kentec\App\Model\Absence;
-use Kentec\App\Model\Project;
 use Kentec\App\Model\State;
+use Kentec\App\Repository\AbsenceRepository;
+use Kentec\App\Repository\ProjectRepository;
+use Kentec\App\Repository\TaskRepository;
 use Kentec\Kernel\Database\Repository;
 use Kentec\Kernel\Http\AbstractController;
 use Kentec\Kernel\Security\InputValidator;
@@ -27,28 +28,19 @@ class ProjectController extends AbstractController
     )]
     final public function index(): void
     {
-        $projectRepo = new Repository(Project::class);
-        $userRepo = new Repository(\Kentec\App\Model\User::class);
-        $taskRepo = new Repository(\Kentec\App\Model\Task::class);
-        $stateRepo = new Repository(\Kentec\App\Model\State::class);
+        $projectRepo = new ProjectRepository();
+        $userRepo    = new Repository(\Kentec\App\Model\User::class);
+        $taskRepo    = new TaskRepository();
+        $stateRepo   = new Repository(State::class);
 
         $currentUser = Security::getUser();
         $userRole    = $currentUser ? ($currentUser->getRoleName() ?? 'USER') : 'USER';
 
         // USER : seulement les projets sur lesquels il a au moins une tâche assignée
         if ($userRole === 'USER' && $currentUser) {
-            $projects = $projectRepo->customQuery(
-                'SELECT DISTINCT p.* FROM project p
-                 INNER JOIN task t ON t.project_id = p.id
-                 INNER JOIN usertaskREL ur ON ur.task_id = t.id
-                 WHERE ur.user_id = :userId AND p.isactive = true
-                 ORDER BY p.id DESC',
-                ['userId' => $currentUser->getId()]
-            );
+            $projects = $projectRepo->findActiveByUserId($currentUser->getId());
         } else {
-            $projects = $projectRepo->customQuery(
-                'SELECT * FROM project WHERE isactive = true ORDER BY id DESC'
-            );
+            $projects = $projectRepo->findAllActive();
         }
 
         // Récupération de tous les utilisateurs une seule fois
@@ -73,7 +65,7 @@ class ProjectController extends AbstractController
         }
 
         // Récupérer les assignations task->user via la table de liaison
-        $assignments = $taskRepo->customQuery('SELECT user_id, task_id FROM usertaskREL');
+        $assignments    = $taskRepo->findAllUserAssignments();
         $taskDevelopers = [];
         foreach ($assignments as $assignment) {
             $taskDevelopers[$assignment['task_id']] = $assignment['user_id'];
@@ -239,34 +231,22 @@ class ProjectController extends AbstractController
         $canCreate   = in_array($userRole, ['ADMIN', 'CDP', 'PDG'], true);
         $canDelete   = in_array($userRole, ['ADMIN', 'PDG'], true);
 
-        $projectRepo = new Repository(Project::class);
+        $projectRepo = new ProjectRepository();
         $userRepo    = new Repository(\Kentec\App\Model\User::class);
-        $taskRepo    = new Repository(\Kentec\App\Model\Task::class);
-        $stateRepo   = new Repository(\Kentec\App\Model\State::class);
+        $taskRepo    = new TaskRepository();
+        $stateRepo   = new Repository(State::class);
 
         // Récupérer le projet actif
-        $projects = $projectRepo->customQuery(
-            'SELECT * FROM project WHERE id = :id AND isactive = true',
-            ['id' => $id]
-        );
+        $project = $projectRepo->findActiveById($id);
 
-        if (empty($projects)) {
+        if ($project === null) {
             header('Location: /projects');
             exit;
         }
 
-        $project = $projects[0];
-
         // Contrôle d'accès : USER ne peut voir que les projets sur lesquels il a une tâche
         if ($userRole === 'USER' && $currentUser) {
-            $assigned = $taskRepo->customQuery(
-                'SELECT 1 FROM task t
-                 INNER JOIN usertaskREL ur ON ur.task_id = t.id
-                 WHERE t.project_id = :projectId AND ur.user_id = :userId
-                 LIMIT 1',
-                ['projectId' => $id, 'userId' => $currentUser->getId()]
-            );
-            if (empty($assigned)) {
+            if (!$taskRepo->isUserAssignedToProject($id, $currentUser->getId())) {
                 header('Location: /projects');
                 exit;
             }
@@ -312,7 +292,7 @@ class ProjectController extends AbstractController
         }
 
         // Récupérer les assignations task->user via la table de liaison
-        $assignments = $taskRepo->customQuery('SELECT user_id, task_id FROM usertaskREL');
+        $assignments    = $taskRepo->findAllUserAssignments();
         $taskDevelopers = [];
         foreach ($assignments as $assignment) {
             $taskDevelopers[$assignment['task_id']] = $assignment['user_id'];
@@ -327,10 +307,8 @@ class ProjectController extends AbstractController
             'progress' => 0,
         ];
 
-        $absenceRepo   = new Repository(Absence::class);
-        $absenceRows   = $absenceRepo->customQuery(
-            "SELECT user_id, startdate, enddate FROM absence WHERE CURRENT_DATE BETWEEN startdate AND enddate"
-        ) ?? [];
+        $absenceRepo   = new AbsenceRepository();
+        $absenceRows   = $absenceRepo->findActiveTodayWithDates();
         $absentUserIds = array_column($absenceRows, 'user_id');
         $absenceByUser = [];
         foreach ($absenceRows as $row) {
@@ -440,7 +418,7 @@ class ProjectController extends AbstractController
         }
 
         try {
-            $projectRepo = new Repository(Project::class);
+            $projectRepo = new ProjectRepository();
             $userRepo    = new Repository(\Kentec\App\Model\User::class);
 
             $currentUser = Security::getUser();
@@ -448,18 +426,9 @@ class ProjectController extends AbstractController
 
             // USER : seulement les projets où il a au moins une tâche assignée
             if ($userRole === 'USER' && $currentUser) {
-                $projects = $projectRepo->customQuery(
-                    'SELECT DISTINCT p.* FROM project p
-                     INNER JOIN task t ON t.project_id = p.id
-                     INNER JOIN usertaskREL ur ON ur.task_id = t.id
-                     WHERE ur.user_id = :userId AND p.isactive = true
-                     ORDER BY p.id DESC',
-                    ['userId' => $currentUser->getId()]
-                );
+                $projects = $projectRepo->findActiveByUserId($currentUser->getId());
             } else {
-                $projects = $projectRepo->customQuery(
-                    'SELECT * FROM project WHERE isactive = true ORDER BY id DESC'
-                );
+                $projects = $projectRepo->findAllActive();
             }
 
             $users = $userRepo->getAll();
@@ -521,51 +490,31 @@ class ProjectController extends AbstractController
                 return;
             }
 
-            $taskRepo    = new Repository(\Kentec\App\Model\Task::class);
-            $projectRepo = new Repository(Project::class);
+            $taskRepo    = new TaskRepository();
+            $projectRepo = new ProjectRepository();
 
             // USER : vérifier qu'il a au moins une tâche sur ce projet
             $currentUser = Security::getUser();
             $userRole    = $currentUser ? ($currentUser->getRoleName() ?? 'USER') : 'USER';
 
             if ($userRole === 'USER' && $currentUser) {
-                $assigned = $taskRepo->customQuery(
-                    'SELECT 1 FROM task t
-                     INNER JOIN usertaskREL ur ON ur.task_id = t.id
-                     WHERE t.project_id = :projectId AND ur.user_id = :userId
-                     LIMIT 1',
-                    ['projectId' => $projectId, 'userId' => $currentUser->getId()]
-                );
-                if (empty($assigned)) {
+                if (!$taskRepo->isUserAssignedToProject($projectId, $currentUser->getId())) {
                     $this->jsonError('Accès non autorisé', 403);
                     return;
                 }
             }
 
-            // Requête enrichie avec jointures
-            $rows = $projectRepo->customQuery(
-                'SELECT p.*,
-                        s.name AS state_name,
-                        c.companyname AS client_name,
-                        u.firstname AS manager_firstname,
-                        u.lastname AS manager_lastname
-                 FROM project p
-                 LEFT JOIN state s ON s.id = p.state_id
-                 LEFT JOIN client c ON c.siret = p.client_id
-                 LEFT JOIN users u ON u.id = p.project_manager_id
-                 WHERE p.id = :id AND p.isactive = true',
-                ['id' => $projectId]
-            );
+            $row = $projectRepo->findWithDetailsById($projectId);
 
-            if (empty($rows)) {
+            if ($row === null) {
                 $this->jsonError('Projet introuvable', 404);
                 return;
             }
 
-            $project = Project::fromDatabaseArray($rows[0]);
+            $project = Project::fromDatabaseArray($row);
 
             // Calcul d'effort via méthode dédiée
-            $effort = $this->calculerEffortProjet($projectId);
+            $effort = $this->calculerEffortProjet($taskRepo, $projectId);
 
             $this->jsonSuccess([
                 'project'            => $project,
@@ -582,30 +531,15 @@ class ProjectController extends AbstractController
      * Calcule les totaux d'effort pour un projet.
      * Utilise COALESCE pour retourner 0 si aucune tâche n'est associée.
      */
-    private function calculerEffortProjet(string $projectId): array
+    private function calculerEffortProjet(TaskRepository $taskRepo, string $projectId): array
     {
-        $taskRepo = new Repository(\Kentec\App\Model\Task::class);
-
-        $rows = $taskRepo->customQuery(
-            'SELECT COALESCE(SUM(t.effortrequired), 0) AS totalEffortRequired,
-                    COALESCE(SUM(t.effortmade), 0) AS totalEffortMade,
-                    COUNT(t.id) AS totalTasks
-             FROM task t
-             WHERE t.project_id = :projectId',
-            ['projectId' => $projectId]
-        );
-
-        return [
-            'totalEffortRequired' => (float) ($rows[0]['totaleffortrequired'] ?? $rows[0]['totalEffortRequired'] ?? 0),
-            'totalEffortMade'     => (float) ($rows[0]['totaleffortmade'] ?? $rows[0]['totalEffortMade'] ?? 0),
-            'totalTasks'          => (int)   ($rows[0]['totaltasks'] ?? $rows[0]['totalTasks'] ?? 0),
-        ];
+        return $taskRepo->findEffortByProjectId($projectId);
     }
 
     final public function dynamicalProjects(): void
     {
-        $projectRepo = new Repository(Project::class);
-        $projects = $projectRepo->customQuery('SELECT * FROM project WHERE isactive = true');
+        $projectRepo = new ProjectRepository();
+        $projects    = $projectRepo->findAllActive();
         $this->render('project/dynamicalProjects.php', ['projects' => $projects]);
     }
 
@@ -642,8 +576,8 @@ class ProjectController extends AbstractController
 
             $currentUser = Security::getUser();
 
-            $projectRepo = new Repository(Project::class);
-            $project = $projectRepo->getById($projectId);
+            $projectRepo = new ProjectRepository();
+            $project     = $projectRepo->getById($projectId);
 
             if (!$project) {
                 $this->jsonError('Project not found', 404);
@@ -651,15 +585,7 @@ class ProjectController extends AbstractController
             }
 
             // Soft delete : isactive = false (jamais de DELETE physique)
-            $updatedby = $currentUser ? $currentUser->getId() : null;
-            $projectRepo->customQuery(
-                'UPDATE project
-                 SET isactive = false,
-                     updatedat = NOW(),
-                     updatedby = :updatedby
-                 WHERE id = :id',
-                ['updatedby' => $updatedby, 'id' => $projectId]
-            );
+            $projectRepo->softDelete($projectId, $currentUser?->getId());
 
             $this->jsonSuccess(['message' => 'Projet archivé avec succès']);
         } catch (\Exception $e) {
@@ -729,7 +655,7 @@ class ProjectController extends AbstractController
 
             $currentUser = Security::getUser();
 
-            $projectRepo = new Repository(Project::class);
+            $projectRepo = new ProjectRepository();
             $stateRepo   = new Repository(State::class);
 
             $project = new Project();
@@ -752,11 +678,9 @@ class ProjectController extends AbstractController
             }
 
             // Attribution automatique du statut "En attente"
-            $statesEnAttente = $stateRepo->customQuery(
-                "SELECT * FROM state WHERE LOWER(name) LIKE '%attente%' LIMIT 1"
-            );
-            if (!empty($statesEnAttente)) {
-                $project->setStateId($statesEnAttente[0]['id']);
+            $defaultStateId = $projectRepo->findDefaultStateId();
+            if ($defaultStateId !== null) {
+                $project->setStateId($defaultStateId);
             }
 
             // Champs d'audit
@@ -827,9 +751,9 @@ class ProjectController extends AbstractController
             }
 
             $currentUser = Security::getUser();
-            $projectRepo = new Repository(Project::class);
+            $projectRepo = new ProjectRepository();
             $stateRepo   = new Repository(State::class);
-            $taskRepo    = new Repository(\Kentec\App\Model\Task::class);
+            $taskRepo    = new TaskRepository();
 
             $project = $projectRepo->getById($projectId);
 
@@ -879,44 +803,16 @@ class ProjectController extends AbstractController
             }
 
             // Mise à jour en base avec updatedat = NOW()
-            $projectRepo->customQuery(
-                'UPDATE project
-                 SET name = :name,
-                     description = :description,
-                     begindate = :begindate,
-                     theoreticaldeadline = :theoreticaldeadline,
-                     realdeadline = :realdeadline,
-                     client_id = :client_id,
-                     project_manager_id = :project_manager_id,
-                     state_id = :state_id,
-                     updatedat = NOW(),
-                     updatedby = :updatedby
-                 WHERE id = :id',
-                [
-                    'name'                => $project->getName(),
-                    'description'         => $project->getDescription(),
-                    'begindate'           => $project->getBeginDate()?->format('Y-m-d'),
-                    'theoreticaldeadline' => $project->getTheoreticalDeadline()?->format('Y-m-d'),
-                    'realdeadline'        => $project->getRealDeadline()?->format('Y-m-d'),
-                    'client_id'           => $project->getClientId(),
-                    'project_manager_id'  => $project->getProjectManagerId(),
-                    'state_id'            => $project->getStateId(),
-                    'updatedby'           => $project->getUpdatedby(),
-                    'id'                  => $projectId,
-                ]
-            );
+            $projectRepo->updateProject($project, $projectId);
 
             // Mise à jour du statut des tâches (sauf si statut = retardé)
             $newStateId = $project->getStateId();
             if ($newStateId && $newStateId !== $previousStateId) {
                 $newState = $stateRepo->getById($newStateId);
-                $isLate = $newState && stripos($newState->getName(), 'retard') !== false;
+                $isLate   = $newState && stripos($newState->getName(), 'retard') !== false;
 
                 if (!$isLate) {
-                    $taskRepo->customQuery(
-                        'UPDATE task SET state_id = :stateId WHERE project_id = :projectId',
-                        ['stateId' => $newStateId, 'projectId' => $projectId]
-                    );
+                    $taskRepo->updateStateForProject($newStateId, $projectId);
                 }
             }
 

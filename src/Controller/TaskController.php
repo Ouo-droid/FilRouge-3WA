@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace Kentec\App\Controller;
 
-use Kentec\App\Model\Absence;
 use Kentec\App\Model\Task;
+use Kentec\App\Repository\AbsenceRepository;
+use Kentec\App\Repository\TaskRepository;
 use Kentec\Kernel\Database\Repository;
 use Kentec\Kernel\Http\AbstractController;
 use Kentec\Kernel\Security\InputValidator;
@@ -26,60 +27,52 @@ class TaskController extends AbstractController
     )]
     final public function index(): void
     {
-        $taskRepo = new Repository(Task::class);
-        $userRepo = new Repository(\Kentec\App\Model\User::class);
+        $taskRepo    = new TaskRepository();
+        $userRepo    = new Repository(\Kentec\App\Model\User::class);
         $projectRepo = new Repository(\Kentec\App\Model\Project::class);
-        $stateRepo = new Repository(\Kentec\App\Model\State::class);
+        $stateRepo   = new Repository(\Kentec\App\Model\State::class);
 
         // Collaborateur : seulement ses tâches assignées
         $currentUser = Security::getUser();
         $role        = $currentUser ? ($currentUser->getRoleName() ?? 'USER') : 'USER';
 
         if ($role === 'USER') {
-            $tasks = $taskRepo->customQuery(
-                'SELECT t.* FROM task t
-                 INNER JOIN usertaskREL ur ON ur.task_id = t.id
-                 WHERE ur.user_id = :userId
-                 ORDER BY t.id DESC',
-                ['userId' => $currentUser->getId()]
-            );
+            $tasks = $taskRepo->findByUserId($currentUser->getId());
         } else {
-            $tasks = $taskRepo->customQuery('SELECT * FROM task ORDER BY id DESC');
+            $tasks = $taskRepo->findAllOrderedById();
         }
 
         // Récupération de tous les utilisateurs une seule fois
-        $users = $userRepo->getAll() ?? [];
+        $users     = $userRepo->getAll() ?? [];
         $usersById = [];
         foreach ($users as $user) {
             $usersById[$user->getId()] = $user;
         }
 
         // Récupération de tous les projets une seule fois
-        $projects = $projectRepo->getAll() ?? [];
+        $projects     = $projectRepo->getAll() ?? [];
         $projectsById = [];
         foreach ($projects as $project) {
             $projectsById[$project->getId()] = $project;
         }
 
         // Récupération de tous les states une seule fois
-        $states = $stateRepo->getAll() ?? [];
+        $states     = $stateRepo->getAll() ?? [];
         $statesById = [];
         foreach ($states as $state) {
             $statesById[$state->getId()] = $state->getName();
         }
 
         // Récupération des assignations user/task via la table de liaison
-        $assignments = $taskRepo->customQuery('SELECT user_id, task_id FROM usertaskREL');
+        $assignments    = $taskRepo->findAllUserAssignments();
         $taskDevelopers = [];
         foreach ($assignments as $assignment) {
             $taskDevelopers[$assignment['task_id']] = $assignment['user_id'];
         }
 
         // Absences actives aujourd'hui
-        $absenceRepo   = new Repository(Absence::class);
-        $absenceRows   = $absenceRepo->customQuery(
-            "SELECT user_id, startdate, enddate FROM absence WHERE CURRENT_DATE BETWEEN startdate AND enddate"
-        ) ?? [];
+        $absenceRepo   = new AbsenceRepository();
+        $absenceRows   = $absenceRepo->findActiveTodayWithDates();
         $absentUserIds = array_column($absenceRows, 'user_id');
         $absenceByUser = array_column($absenceRows, null, 'user_id');
 
@@ -152,7 +145,7 @@ class TaskController extends AbstractController
     {
         if ('GET' === $_SERVER['REQUEST_METHOD']) {
             try {
-                $taskRepo    = new Repository(Task::class);
+                $taskRepo    = new TaskRepository();
                 $userRepo    = new Repository(\Kentec\App\Model\User::class);
                 $projectRepo = new Repository(\Kentec\App\Model\Project::class);
 
@@ -161,33 +154,27 @@ class TaskController extends AbstractController
 
                 // USER : seulement ses tâches assignées
                 if ($role === 'USER' && $currentUser) {
-                    $tasks = $taskRepo->customQuery(
-                        'SELECT t.* FROM task t
-                         INNER JOIN usertaskREL ur ON ur.task_id = t.id
-                         WHERE ur.user_id = :userId
-                         ORDER BY t.id DESC',
-                        ['userId' => $currentUser->getId()]
-                    );
+                    $tasks = $taskRepo->findByUserId($currentUser->getId());
                 } else {
-                    $tasks = $taskRepo->customQuery('SELECT * FROM task ORDER BY id DESC');
+                    $tasks = $taskRepo->findAllOrderedById();
                 }
 
                 // Récupération de tous les utilisateurs une seule fois
-                $users = $userRepo->getAll() ?? [];
+                $users     = $userRepo->getAll() ?? [];
                 $usersById = [];
                 foreach ($users as $user) {
                     $usersById[$user->getId()] = $user;
                 }
 
                 // Récupération de tous les projets une seule fois
-                $projects = $projectRepo->getAll() ?? [];
+                $projects     = $projectRepo->getAll() ?? [];
                 $projectsById = [];
                 foreach ($projects as $project) {
                     $projectsById[$project->getId()] = $project;
                 }
 
                 // Récupération des assignations user/task via la table de liaison
-                $assignments = $taskRepo->customQuery('SELECT user_id, task_id FROM usertaskREL');
+                $assignments    = $taskRepo->findAllUserAssignments();
                 $taskDevelopers = [];
                 foreach ($assignments as $assignment) {
                     $taskDevelopers[$assignment['task_id']] = $assignment['user_id'];
@@ -261,18 +248,14 @@ class TaskController extends AbstractController
                     throw new \Exception('Invalid UUID format');
                 }
 
-                $taskRepo = new Repository(Task::class);
+                $taskRepo = new TaskRepository();
 
                 // USER : vérifier qu'il est bien assigné à cette tâche
                 $currentUser = Security::getUser();
                 $role        = $currentUser ? ($currentUser->getRoleName() ?? 'USER') : 'USER';
 
                 if ($role === 'USER' && $currentUser) {
-                    $assigned = $taskRepo->customQuery(
-                        'SELECT 1 FROM usertaskREL WHERE task_id = :taskId AND user_id = :userId LIMIT 1',
-                        ['taskId' => $taskId, 'userId' => $currentUser->getId()]
-                    );
-                    if (empty($assigned)) {
+                    if (!$taskRepo->isAssignedToUser($taskId, $currentUser->getId())) {
                         $this->jsonError('Accès non autorisé', 403);
                         return;
                     }
@@ -326,8 +309,8 @@ class TaskController extends AbstractController
                     return;
                 }
 
-                $taskRepo = new Repository(Task::class);
-                $task = $taskRepo->getById($taskId);
+                $taskRepo = new TaskRepository();
+                $task     = $taskRepo->getById($taskId);
 
                 if (!$task) {
                     $this->json([
@@ -339,10 +322,7 @@ class TaskController extends AbstractController
                 }
 
                 // Supprimer d'abord la relation usertaskREL (FK constraint)
-                $taskRepo->customQuery(
-                    'DELETE FROM usertaskrel WHERE task_id = :task_id',
-                    [':task_id' => $taskId]
-                );
+                $taskRepo->deleteUserAssignment($taskId);
 
                 $taskRepo->delete($taskId);
 
@@ -368,7 +348,6 @@ class TaskController extends AbstractController
     #[OA\Post(
         path: '/api/add/task',
         summary: 'Add new task (JSON)',
-        tags: ['Tasks'],
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\JsonContent(
@@ -390,6 +369,7 @@ class TaskController extends AbstractController
                 ]
             )
         ),
+        tags: ['Tasks'],
         responses: [
             new OA\Response(response: 200, description: 'Task created'),
             new OA\Response(response: 400, description: 'Invalid input'),
@@ -418,8 +398,8 @@ class TaskController extends AbstractController
                     throw new \Exception('Le type de la tâche est obligatoire.');
                 }
 
-                $taskRepo = new Repository(Task::class);
-                $task = new Task();
+                $taskRepo = new TaskRepository();
+                $task     = new Task();
 
                 // Assignation des valeurs
                 $task->setName($inputData['name']);
@@ -471,27 +451,12 @@ class TaskController extends AbstractController
                 }
 
                 // Sauvegarde avec récupération de l'ID généré
-                $taskData = $task->toDatabaseArray();
-                $columns = implode(', ', array_keys($taskData));
-                $placeholders = implode(', ', array_map(fn ($k) => ":$k", array_keys($taskData)));
-                $insertSql = "INSERT INTO task ($columns) VALUES ($placeholders) RETURNING id";
-                $params = array_combine(
-                    array_map(fn ($k) => ":$k", array_keys($taskData)),
-                    array_values($taskData)
-                );
-                $result = $taskRepo->customQuery($insertSql, $params);
-                $newTaskId = $result[0]['id'] ?? null;
+                $newTaskId = $taskRepo->insertAndReturnId($task);
 
                 // Assignation du développeur
                 if ($newTaskId && !empty($inputData['developerId']) && InputValidator::validateUuid($inputData['developerId'])) {
-                    $taskRepo->customQuery(
-                        'DELETE FROM usertaskrel WHERE task_id = :task_id',
-                        [':task_id' => $newTaskId]
-                    );
-                    $taskRepo->customQuery(
-                        'INSERT INTO usertaskrel (user_id, task_id) VALUES (:user_id, :task_id)',
-                        [':user_id' => $inputData['developerId'], ':task_id' => $newTaskId]
-                    );
+                    $taskRepo->deleteUserAssignment($newTaskId);
+                    $taskRepo->insertUserAssignment($inputData['developerId'], $newTaskId);
                 }
 
                 $this->json([
@@ -516,10 +481,6 @@ class TaskController extends AbstractController
     #[OA\Put(
         path: '/api/edit/task/{taskId}',
         summary: 'Edit task (JSON)',
-        tags: ['Tasks'],
-        parameters: [
-            new OA\Parameter(name: 'taskId', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid')),
-        ],
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\JsonContent(
@@ -541,6 +502,10 @@ class TaskController extends AbstractController
                 ]
             )
         ),
+        tags: ['Tasks'],
+        parameters: [
+            new OA\Parameter(name: 'taskId', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid')),
+        ],
         responses: [
             new OA\Response(response: 200, description: 'Task updated'),
             new OA\Response(response: 404, description: 'Task not found'),
@@ -567,8 +532,8 @@ class TaskController extends AbstractController
                     throw new \Exception('No data received');
                 }
 
-                $taskRepo = new Repository(Task::class);
-                $task = $taskRepo->getById($taskId);
+                $taskRepo = new TaskRepository();
+                $task     = $taskRepo->getById($taskId);
 
                 if (!$task) {
                     throw new \Exception('Task not found');
@@ -636,14 +601,8 @@ class TaskController extends AbstractController
 
                 // Assignation du développeur
                 if (!empty($inputData['developerId']) && InputValidator::validateUuid($inputData['developerId'])) {
-                    $taskRepo->customQuery(
-                        'DELETE FROM usertaskrel WHERE task_id = :task_id',
-                        [':task_id' => $taskId]
-                    );
-                    $taskRepo->customQuery(
-                        'INSERT INTO usertaskrel (user_id, task_id) VALUES (:user_id, :task_id)',
-                        [':user_id' => $inputData['developerId'], ':task_id' => $taskId]
-                    );
+                    $taskRepo->deleteUserAssignment($taskId);
+                    $taskRepo->insertUserAssignment($inputData['developerId'], $taskId);
                 }
 
                 $this->json([

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Kentec\App\Controller;
 
 use Kentec\App\Model\Absence;
-use Kentec\Kernel\Database\Repository;
+use Kentec\App\Repository\AbsenceRepository;
 use Kentec\Kernel\Http\AbstractController;
 use Kentec\Kernel\Security\InputValidator;
 use Kentec\Kernel\Security\Security;
@@ -31,8 +31,8 @@ class AbsenceController extends AbstractController
         }
 
         try {
-            $repo      = new Repository(Absence::class);
-            $absences  = $repo->customQuery('SELECT * FROM absence ORDER BY startdate DESC') ?? [];
+            $repo     = new AbsenceRepository();
+            $absences = $repo->findAll();
             $this->json(['success' => true, 'absences' => $absences]);
         } catch (\Exception $e) {
             $this->json(['success' => false, 'error' => $e->getMessage()]);
@@ -65,11 +65,8 @@ class AbsenceController extends AbstractController
         }
 
         try {
-            $repo     = new Repository(Absence::class);
-            $absences = $repo->customQuery(
-                'SELECT * FROM absence WHERE user_id = :userId ORDER BY startdate DESC',
-                ['userId' => $userId]
-            ) ?? [];
+            $repo     = new AbsenceRepository();
+            $absences = $repo->findByUserId($userId);
             $this->json(['success' => true, 'absences' => $absences]);
         } catch (\Exception $e) {
             $this->json(['success' => false, 'error' => $e->getMessage()]);
@@ -95,14 +92,8 @@ class AbsenceController extends AbstractController
         }
 
         try {
-            $repo     = new Repository(Absence::class);
-            $absences = $repo->customQuery(
-                "SELECT a.*, u.firstname, u.lastname
-                 FROM absence a
-                 JOIN users u ON u.id = a.user_id
-                 WHERE CURRENT_DATE BETWEEN a.startdate AND a.enddate
-                 ORDER BY a.startdate"
-            ) ?? [];
+            $repo     = new AbsenceRepository();
+            $absences = $repo->findActiveTodayWithUsers();
             $this->json(['success' => true, 'absences' => $absences]);
         } catch (\Exception $e) {
             $this->json(['success' => false, 'error' => $e->getMessage()]);
@@ -166,7 +157,7 @@ class AbsenceController extends AbstractController
             $absence->setStartdate($start->format('Y-m-d'));
             $absence->setEnddate($end->format('Y-m-d'));
 
-            $repo = new Repository(Absence::class);
+            $repo = new AbsenceRepository();
             $repo->insert($absence);
 
             $this->json(['success' => true, 'message' => 'Absence déclarée avec succès.']);
@@ -215,7 +206,7 @@ class AbsenceController extends AbstractController
             $absence->setStartdate($start->format('Y-m-d'));
             $absence->setEnddate($end->format('Y-m-d'));
 
-            $repo = new Repository(Absence::class);
+            $repo = new AbsenceRepository();
             $repo->insert($absence);
 
             $this->json(['success' => true, 'message' => 'Demande d\'absence enregistrée.']);
@@ -252,7 +243,7 @@ class AbsenceController extends AbstractController
         }
 
         try {
-            $repo    = new Repository(Absence::class);
+            $repo    = new AbsenceRepository();
             $deleted = $repo->delete($id);
 
             if ($deleted) {

@@ -228,7 +228,6 @@ function calculateDuration($start, $end)
                             $varianceSign = ($variance && $variance > 0) ? '+' : '';
                             ?>
                             <div class="task-card <?php echo !empty($task['dev_absent']) ? 'task-card--absent' : ''; ?>"
-                                 data-state-id="<?php echo $task['state_id'] ?? ''; ?>"
                                  data-project-id="<?php echo htmlspecialchars($task['project_id'] ?? ''); ?>"
                                  data-developer-id="<?php echo htmlspecialchars($task['developer_id'] ?? ''); ?>">
 

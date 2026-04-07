@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Kentec\App\Controller;
 
+use Kentec\App\Repository\TaskRepository;
 use Kentec\Kernel\Database\SearchableRepository;
 use Kentec\Kernel\Http\AbstractController;
 use OpenApi\Attributes as OA;
@@ -267,24 +268,14 @@ class SearchController extends AbstractController
         }
 
         $userId   = $currentUser->getId();
-        $taskRepo = new \Kentec\Kernel\Database\Repository(\Kentec\App\Model\Task::class);
+        $taskRepo = new TaskRepository();
 
         if ($entityType === 'tasks') {
-            $rows = $taskRepo->customQuery(
-                'SELECT task_id FROM usertaskREL WHERE user_id = :userId',
-                ['userId' => $userId]
-            ) ?? [];
-            return array_column($rows, 'task_id');
+            return $taskRepo->findTaskIdsByUserId($userId);
         }
 
         if ($entityType === 'projects') {
-            $rows = $taskRepo->customQuery(
-                'SELECT DISTINCT t.project_id FROM task t
-                 INNER JOIN usertaskREL ur ON ur.task_id = t.id
-                 WHERE ur.user_id = :userId AND t.project_id IS NOT NULL',
-                ['userId' => $userId]
-            ) ?? [];
-            return array_column($rows, 'project_id');
+            return $taskRepo->findProjectIdsByUserId($userId);
         }
 
         return null;
