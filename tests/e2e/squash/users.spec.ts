@@ -27,15 +27,15 @@ test.describe('Squash - Utilisateurs', () => {
         await page.fill('#password', 'Squash79@');
 
         page.on('dialog', dialog => dialog.accept());
-        await page.click('#form-add-user button[type="submit"]');
+        await page.click('#users-form-submit');
         await page.waitForTimeout(2000);
 
-        await expect(page.locator('.item-card').filter({ hasText: `${firstname} ${lastname}` }).first()).toBeVisible();
+        await expect(page.locator('.user-card').filter({ hasText: `${firstname} ${lastname}` }).first()).toBeVisible();
 
         // Suppression
         page.once('dialog', dialog => dialog.accept());
-        await page.locator('.item-card').filter({ hasText: `${firstname} ${lastname}` }).locator('.btn-danger').click();
+        await page.locator('.user-card').filter({ hasText: `${firstname} ${lastname}` }).locator('.delete-user').click();
         await page.waitForTimeout(2000);
-        await expect(page.locator('.item-card').filter({ hasText: email })).not.toBeVisible();
+        await expect(page.locator('.user-card').filter({ hasText: email })).not.toBeVisible();
     });
 });

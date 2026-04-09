@@ -22,33 +22,43 @@ test.describe('Squash - Clients', () => {
         await page.click('#create-client-btn');
         await page.waitForSelector('.form-overlay', { state: 'visible' });
         // Utilisation des sélecteurs vus dans clients.spec.ts
-        await page.fill('#create-siret', siret);
-        await page.fill('#create-company-name', companyName);
-        await page.fill('#create-workfield', 'Squash Testing');
-        await page.fill('#create-contact-firstname', 'Antoine');
-        await page.fill('#create-contact-lastname', 'Squash');
+        await page.fill('#siret', siret);
+        await page.fill('#companyName', companyName);
+        await page.fill('#workfield', 'Squash Testing');
+        await page.fill('#contactFirstname', 'Antoine');
+        await page.fill('#contactLastname', 'Squash');
+        await page.fill('#contactEmail', `test-${Date.now()}@example.com`);
+        await page.fill('#streetNumber', '10');
+        await page.fill('#streetName', 'Rue de Squash');
+        await page.fill('#postCode', '75000');
+        await page.fill('#city', 'Paris');
 
         page.on('dialog', dialog => dialog.accept());
         await page.click('.btn-save');
         await page.waitForTimeout(2000);
 
-        await expect(page.locator('.item-card h3').filter({ hasText: companyName }).first()).toBeVisible();
+        await expect(page.locator('.client-row h3').filter({ hasText: companyName }).first()).toBeVisible();
 
         // Édition
-        await page.locator('.item-card').filter({ hasText: companyName }).first().locator('.btn-warning').click();
+        // Les boutons sont dans un dropdown
+        await page.locator('.client-row').filter({ hasText: companyName }).first().locator('.btn-menu').click();
+        await page.locator('.edit-client-btn').filter({ hasText: /Modifier/i }).click();
+
         await page.waitForSelector('.form-overlay', { state: 'visible' });
         const updatedName = companyName + ' Updated';
-        await page.fill('input[name="companyName"]', updatedName);
+        await page.fill('#companyName', updatedName);
         await page.click('.btn-save');
         await page.waitForLoadState('load');
         await page.waitForTimeout(2000);
-        await expect(page.locator('.item-card h3').filter({ hasText: updatedName }).first()).toBeVisible();
+        await expect(page.locator('.client-row h3').filter({ hasText: updatedName }).first()).toBeVisible();
 
         // Suppression
         page.once('dialog', dialog => dialog.accept());
-        await page.locator('.item-card').filter({ hasText: updatedName }).first().locator('.btn-danger').click();
+        await page.locator('.client-row').filter({ hasText: updatedName }).first().locator('.btn-menu').click();
+        await page.locator('.delete-client-btn').filter({ hasText: /Supprimer/i }).click();
+
         await page.waitForLoadState('load');
         await page.waitForTimeout(2000);
-        await expect(page.locator('.item-card h3').filter({ hasText: updatedName }).first()).not.toBeVisible();
+        await expect(page.locator('.client-row h3').filter({ hasText: updatedName }).first()).not.toBeVisible();
     });
 });

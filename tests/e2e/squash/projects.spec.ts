@@ -20,30 +20,30 @@ test.describe('Squash - Projets', () => {
         // Création
         await page.click('#create-project-btn');
         await page.waitForSelector('.form-overlay', { state: 'visible' });
-        await page.fill('input[name="name"]', projectName);
-        await page.fill('textarea[name="description"]', 'Description Squash');
-        await page.fill('input[name="beginDate"]', '2026-01-01');
-        await page.fill('input[name="theoricalDeadLine"]', '2026-12-31');
+        await page.fill('#create-name', projectName);
+        await page.fill('#create-description', 'Description Squash');
+        await page.fill('#create-begin-date', '2026-01-01');
+        await page.fill('#create-theoretical-deadline', '2026-12-31');
 
         page.on('dialog', dialog => dialog.accept());
         await page.click('.btn-save');
         await page.waitForTimeout(2000);
 
-        await expect(page.locator('.item-card h3').filter({ hasText: projectName })).toBeVisible();
+        await expect(page.locator('.project-card__name').filter({ hasText: projectName })).toBeVisible();
 
         // Édition
-        await page.locator('.item-card').filter({ hasText: projectName }).locator('.btn-warning').click();
+        await page.locator('.project-card').filter({ hasText: projectName }).locator('.edit-project-btn').click();
         await page.waitForSelector('.form-overlay', { state: 'visible' });
         const updatedName = projectName + ' (MAJ)';
-        await page.fill('input[name="name"]', updatedName);
+        await page.fill('#edit-name', updatedName);
         await page.click('.btn-save');
         await page.waitForTimeout(2000);
-        await expect(page.locator('.item-card h3').filter({ hasText: updatedName })).toBeVisible();
+        await expect(page.locator('.project-card__name').filter({ hasText: updatedName })).toBeVisible();
 
         // Suppression
         page.once('dialog', dialog => dialog.accept());
-        await page.locator('.item-card').filter({ hasText: updatedName }).locator('.btn-danger').click();
+        await page.locator('.project-card').filter({ hasText: updatedName }).locator('.delete-project-btn').click();
         await page.waitForTimeout(2000);
-        await expect(page.locator('.item-card h3').filter({ hasText: updatedName })).not.toBeVisible();
+        await expect(page.locator('.project-card__name').filter({ hasText: updatedName })).not.toBeVisible();
     });
 });

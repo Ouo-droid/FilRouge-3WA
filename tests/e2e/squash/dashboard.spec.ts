@@ -10,8 +10,7 @@ test.describe('Squash - Dashboard', () => {
     test('Chargement du Dashboard', async ({ page }) => {
         await page.goto(`${BASE_URL}/`);
         // Vérifier un élément clé du dashboard, par exemple le logo ou un titre
-        await expect(page.locator('.logo h4')).toBeVisible();
-        await expect(page.locator('.logo h4')).toContainText('KENTEC');
+        await expect(page.locator('.sidebar-logo img')).toBeVisible();
     });
 
     test('Navigation vers les Projets depuis la Sidebar', async ({ page }) => {

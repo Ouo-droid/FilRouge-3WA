@@ -5,7 +5,7 @@ test.describe('Squash - Authentification', () => {
 
     test('Accès à la page de login', async ({ page }) => {
         await page.goto(`${BASE_URL}/login`);
-        await expect(page).toHaveTitle(/KENTEC - Système de Gestion/i);
+        await expect(page).toHaveTitle(/KenTec/i);
     });
 
     test('Échec de connexion avec mauvais identifiants', async ({ page }) => {
