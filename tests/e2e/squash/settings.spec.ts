@@ -9,6 +9,6 @@ test.describe('Squash - Paramètres', () => {
 
     test('Chargement de la page des paramètres', async ({ page }) => {
         await page.goto(`${BASE_URL}/settings`);
-        await expect(page.locator('h1')).toContainText(/Paramètres|Mon Profil/i);
+        await expect(page.locator('.settings-header h1')).toContainText(/Paramètres/i);
     });
 });
