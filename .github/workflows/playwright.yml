@@ -13,18 +13,18 @@ jobs:
     runs-on: ubuntu-latest
 
     services:
-      mysql:
-        image: mysql:8.0
+      postgres:
+        image: postgres:17
         env:
-          MYSQL_ROOT_PASSWORD: root
-          MYSQL_DATABASE: fil_rouge_test
+          POSTGRES_PASSWORD: root
+          POSTGRES_DB: fil_rouge_test
         ports:
-          - 3306:3306
+          - 5432:5432
         options: >-
-          --health-cmd="mysqladmin ping"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=3
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
       - name: Checkout du code
@@ -35,7 +35,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.3'
-          extensions: pdo, pdo_mysql, mbstring
+          extensions: pdo, pdo_pgsql, mbstring
           coverage: none
 
       # Installation des dépendances PHP
@@ -61,8 +61,8 @@ jobs:
       - name: Créer le fichier .env
         run: |
           cat > .env << EOF
-          DSN=mysql:host=127.0.0.1;dbname=fil_rouge_test
-          USERNAME=root
+          DSN=pgsql:host=127.0.0.1;port=5432;dbname=fil_rouge_test
+          USERNAME=postgres
           PASSWORD=root
           CONTROLLER_NAMESPACE=Kentec\App\Controller\\
           MODEL_NAMESPACE=Kentec\App\Model\\
@@ -72,7 +72,7 @@ jobs:
       # Import de la base de données
       - name: Import du schéma de base de données
         run: |
-          mysql -h 127.0.0.1 -uroot -proot fil_rouge_test < fil_rouge.sql
+          PGPASSWORD=root psql -h 127.0.0.1 -U postgres -d fil_rouge_test < GenDBWithFewDatas.sql
 
       # Démarrage du serveur PHP en arrière-plan
       - name: Démarrer le serveur PHP
