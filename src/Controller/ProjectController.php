@@ -38,9 +38,16 @@ class ProjectController extends AbstractController
 
         // USER : seulement les projets sur lesquels il a au moins une tâche assignée
         if ($userRole === 'USER' && $currentUser) {
-            $projects = $projectRepo->findActiveByUserId($currentUser->getId());
+            $projects = $projectRepo->customQuery(
+                'SELECT DISTINCT p.* FROM project p
+                 INNER JOIN task t ON t.project_id = p.id
+                 INNER JOIN usertaskREL ur ON ur.task_id = t.id
+                 WHERE ur.user_id = :userId AND p.isactive = true
+                 ORDER BY p.id DESC',
+                ['userId' => $currentUser->getId()]
+            );
         } else {
-            $projects = $projectRepo->findAllActive();
+            $projects = $projectRepo->customQuery('SELECT * FROM project WHERE isactive = true ORDER BY id DESC');
         }
 
         // Récupération de tous les utilisateurs une seule fois
@@ -237,7 +244,11 @@ class ProjectController extends AbstractController
         $stateRepo   = new Repository(State::class);
 
         // Récupérer le projet actif
-        $project = $projectRepo->findActiveById($id);
+        $results = $projectRepo->customQuery(
+            'SELECT * FROM project WHERE id = :id AND isactive = true',
+            ['id' => $id]
+        );
+        $project = !empty($results) ? $results[0] : null;
 
         if ($project === null) {
             header('Location: /projects');
@@ -373,6 +384,7 @@ class ProjectController extends AbstractController
         $effortRequired = 0.0;
         $effortMade     = 0.0;
         foreach ($tasks as $task) {
+            // effortrequired + effortmade pour le test
             $effortRequired += (float) ($task->getEffortrequired() ?? 0);
             $effortMade     += (float) ($task->getEffortmade()     ?? 0);
         }
@@ -426,9 +438,16 @@ class ProjectController extends AbstractController
 
             // USER : seulement les projets où il a au moins une tâche assignée
             if ($userRole === 'USER' && $currentUser) {
-                $projects = $projectRepo->findActiveByUserId($currentUser->getId());
+                $projects = $projectRepo->customQuery(
+                    'SELECT DISTINCT p.* FROM project p
+                     INNER JOIN task t ON t.project_id = p.id
+                     INNER JOIN usertaskREL ur ON ur.task_id = t.id
+                     WHERE ur.user_id = :userId AND p.isactive = true
+                     ORDER BY p.id DESC',
+                    ['userId' => $currentUser->getId()]
+                );
             } else {
-                $projects = $projectRepo->findAllActive();
+                $projects = $projectRepo->customQuery('SELECT * FROM project WHERE isactive = true ORDER BY id DESC');
             }
 
             $users = $userRepo->getAll();
@@ -504,7 +523,20 @@ class ProjectController extends AbstractController
                 }
             }
 
-            $row = $projectRepo->findWithDetailsById($projectId);
+            $rows = $projectRepo->customQuery(
+                'SELECT p.*,
+                        s.name AS state_name,
+                        c.companyname AS client_name,
+                        u.firstname AS manager_firstname,
+                        u.lastname AS manager_lastname
+                 FROM project p
+                 LEFT JOIN state s ON s.id = p.state_id
+                 LEFT JOIN client c ON c.siret = p.client_id
+                 LEFT JOIN users u ON u.id = p.project_manager_id
+                 WHERE p.id = :id AND p.isactive = true',
+                ['id' => $projectId]
+            );
+            $row = !empty($rows) ? $rows[0] : null;
 
             if ($row === null) {
                 $this->jsonError('Projet introuvable', 404);
@@ -539,7 +571,7 @@ class ProjectController extends AbstractController
     final public function dynamicalProjects(): void
     {
         $projectRepo = new ProjectRepository();
-        $projects    = $projectRepo->findAllActive();
+        $projects    = $projectRepo->customQuery('SELECT * FROM project WHERE isactive = true ORDER BY id DESC');
         $this->render('project/dynamicalProjects.php', ['projects' => $projects]);
     }
 
@@ -585,9 +617,14 @@ class ProjectController extends AbstractController
             }
 
             // Soft delete : isactive = false (jamais de DELETE physique)
+            // updatedby est renseigné via softDelete
             $projectRepo->softDelete($projectId, $currentUser?->getId());
 
-            $this->jsonSuccess(['message' => 'Projet archivé avec succès']);
+            // Archiver également toutes les tâches associées au projet
+            $taskRepo = new TaskRepository();
+            $taskRepo->archiveByProject($projectId, $currentUser?->getId());
+
+            $this->jsonSuccess(['message' => 'Projet et ses tâches archivés avec succès']);
         } catch (\Exception $e) {
             $this->jsonError($e->getMessage(), 500);
         }

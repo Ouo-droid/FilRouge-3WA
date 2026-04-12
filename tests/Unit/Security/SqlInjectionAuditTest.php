@@ -46,9 +46,9 @@ class SqlInjectionAuditTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->cheminRepository  = __DIR__ . '/../../../kernel/Utils/Repository.php';
+        $this->cheminRepository  = __DIR__ . '/../../../kernel/Database/Repository.php';
         $this->cheminSqlBuilder  = __DIR__ . '/../../../kernel/Database/SqlBuilder.php';
-        $this->cheminQueryBuilder = __DIR__ . '/../../../kernel/Utils/QueryBuilder.php';
+        $this->cheminQueryBuilder = __DIR__ . '/../../../kernel/Database/QueryBuilder.php';
 
         $this->codeRepository   = file_get_contents($this->cheminRepository);
         $this->codeSqlBuilder   = file_get_contents($this->cheminSqlBuilder);

@@ -1,0 +1,91 @@
+[Sat Apr 11 19:14:22 2026] PHP 8.3.6 Development Server (http://localhost:8000) started
+[Sat Apr 11 19:16:43 2026] [::1]:40546 Accepted
+[Sat Apr 11 19:16:43 2026] [::1]:40546 [200]: GET /login
+[Sat Apr 11 19:16:43 2026] [::1]:40546 Closing
+[Sat Apr 11 19:16:43 2026] [::1]:40560 Accepted
+[Sat Apr 11 19:16:43 2026] [::1]:40568 Accepted
+[Sat Apr 11 19:16:43 2026] [::1]:40560 [200]: GET /build/app.bundle.css?v=1775935003
+[Sat Apr 11 19:16:43 2026] [::1]:40568 [200]: GET /build/app.bundle.js?v=1775935003
+[Sat Apr 11 19:16:43 2026] [::1]:40560 Closing
+[Sat Apr 11 19:16:43 2026] [::1]:40568 Closing
+[Sat Apr 11 19:16:44 2026] [::1]:40578 Accepted
+[Sat Apr 11 19:16:44 2026] [::1]:40578 [200]: POST /login
+[Sat Apr 11 19:16:44 2026] [::1]:40578 Closing
+[Sat Apr 11 19:16:45 2026] [::1]:39720 Accepted
+[Sat Apr 11 19:16:45 2026] [::1]:39726 Accepted
+[Sat Apr 11 19:16:45 2026] [::1]:39720 [200]: GET /build/app.bundle.css?v=1775935004
+[Sat Apr 11 19:16:45 2026] [::1]:39726 [200]: GET /build/app.bundle.js?v=1775935004
+[Sat Apr 11 19:16:45 2026] [::1]:39720 Closing
+[Sat Apr 11 19:16:45 2026] [::1]:39726 Closing
+[Sat Apr 11 19:16:46 2026] [::1]:39730 Accepted
+[Sat Apr 11 19:16:46 2026] [::1]:39730 [302]: GET /projects
+[Sat Apr 11 19:16:46 2026] [::1]:39730 Closing
+[Sat Apr 11 19:16:46 2026] [::1]:39740 Accepted
+[Sat Apr 11 19:16:46 2026] [::1]:39740 [200]: GET /login
+[Sat Apr 11 19:16:46 2026] [::1]:39740 Closing
+[Sat Apr 11 19:16:46 2026] [::1]:39742 Accepted
+[Sat Apr 11 19:16:46 2026] [::1]:39754 Accepted
+[Sat Apr 11 19:16:46 2026] [::1]:39742 [200]: GET /build/app.bundle.css?v=1775935006
+[Sat Apr 11 19:16:46 2026] [::1]:39754 [200]: GET /build/app.bundle.js?v=1775935006
+[Sat Apr 11 19:16:46 2026] [::1]:39742 Closing
+[Sat Apr 11 19:16:46 2026] [::1]:39754 Closing
+[Sat Apr 11 19:27:14 2026] [::1]:56098 Accepted
+[Sat Apr 11 19:27:14 2026] [::1]:56098 [200]: GET /login
+[Sat Apr 11 19:27:14 2026] [::1]:56098 Closing
+[Sat Apr 11 19:27:14 2026] [::1]:56114 Accepted
+[Sat Apr 11 19:27:14 2026] [::1]:56114 [200]: GET /build/app.bundle.css?v=1775935634
+[Sat Apr 11 19:27:14 2026] [::1]:56114 Closing
+[Sat Apr 11 19:27:14 2026] [::1]:56126 Accepted
+[Sat Apr 11 19:27:14 2026] [::1]:56126 [200]: GET /build/app.bundle.js?v=1775935634
+[Sat Apr 11 19:27:14 2026] [::1]:56126 Closing
+[Sat Apr 11 19:27:15 2026] [::1]:39982 Accepted
+[Sat Apr 11 19:27:15 2026] [::1]:39982 [200]: POST /login
+[Sat Apr 11 19:27:15 2026] [::1]:39982 Closing
+[Sat Apr 11 19:27:15 2026] [::1]:39998 Accepted
+[Sat Apr 11 19:27:15 2026] [::1]:40008 Accepted
+[Sat Apr 11 19:27:15 2026] [::1]:39998 [200]: GET /build/app.bundle.css?v=1775935635
+[Sat Apr 11 19:27:15 2026] [::1]:40008 [200]: GET /build/app.bundle.js?v=1775935635
+[Sat Apr 11 19:27:15 2026] [::1]:39998 Closing
+[Sat Apr 11 19:27:15 2026] [::1]:40008 Closing
+[Sat Apr 11 19:27:16 2026] [::1]:40010 Accepted
+[Sat Apr 11 19:27:16 2026] [::1]:40010 [302]: GET /projects
+[Sat Apr 11 19:27:16 2026] [::1]:40010 Closing
+[Sat Apr 11 19:27:16 2026] [::1]:40018 Accepted
+[Sat Apr 11 19:27:16 2026] [::1]:40018 [200]: GET /login
+[Sat Apr 11 19:27:16 2026] [::1]:40018 Closing
+[Sat Apr 11 19:27:16 2026] [::1]:40026 Accepted
+[Sat Apr 11 19:27:16 2026] [::1]:40042 Accepted
+[Sat Apr 11 19:27:16 2026] [::1]:40026 [200]: GET /build/app.bundle.css?v=1775935636
+[Sat Apr 11 19:27:16 2026] [::1]:40042 [200]: GET /build/app.bundle.js?v=1775935636
+[Sat Apr 11 19:27:16 2026] [::1]:40026 Closing
+[Sat Apr 11 19:27:16 2026] [::1]:40042 Closing
+[Sun Apr 12 10:46:34 2026] [::1]:51002 Accepted
+[Sun Apr 12 10:46:34 2026] [::1]:51002 [200]: GET /login
+[Sun Apr 12 10:46:34 2026] [::1]:51002 Closing
+[Sun Apr 12 10:46:34 2026] [::1]:51012 Accepted
+[Sun Apr 12 10:46:34 2026] [::1]:51012 [200]: GET /build/app.bundle.css?v=1775990794
+[Sun Apr 12 10:46:35 2026] [::1]:51012 Closing
+[Sun Apr 12 10:46:35 2026] [::1]:51018 Accepted
+[Sun Apr 12 10:46:35 2026] [::1]:51018 [200]: GET /build/app.bundle.js?v=1775990794
+[Sun Apr 12 10:46:35 2026] [::1]:51018 Closing
+[Sun Apr 12 10:46:36 2026] [::1]:51026 Accepted
+[Sun Apr 12 10:46:36 2026] [::1]:51026 [200]: POST /login
+[Sun Apr 12 10:46:36 2026] [::1]:51026 Closing
+[Sun Apr 12 10:46:36 2026] [::1]:51042 Accepted
+[Sun Apr 12 10:46:36 2026] [::1]:51052 Accepted
+[Sun Apr 12 10:46:36 2026] [::1]:51042 [200]: GET /build/app.bundle.css?v=1775990796
+[Sun Apr 12 10:46:36 2026] [::1]:51052 [200]: GET /build/app.bundle.js?v=1775990796
+[Sun Apr 12 10:46:36 2026] [::1]:51042 Closing
+[Sun Apr 12 10:46:36 2026] [::1]:51052 Closing
+[Sun Apr 12 10:46:37 2026] [::1]:51058 Accepted
+[Sun Apr 12 10:46:37 2026] [::1]:51058 [302]: GET /projects
+[Sun Apr 12 10:46:37 2026] [::1]:51058 Closing
+[Sun Apr 12 10:46:37 2026] [::1]:51070 Accepted
+[Sun Apr 12 10:46:37 2026] [::1]:51070 [200]: GET /login
+[Sun Apr 12 10:46:37 2026] [::1]:51070 Closing
+[Sun Apr 12 10:46:37 2026] [::1]:51074 Accepted
+[Sun Apr 12 10:46:37 2026] [::1]:51084 Accepted
+[Sun Apr 12 10:46:37 2026] [::1]:51074 [200]: GET /build/app.bundle.css?v=1775990797
+[Sun Apr 12 10:46:37 2026] [::1]:51074 Closing
+[Sun Apr 12 10:46:37 2026] [::1]:51084 [200]: GET /build/app.bundle.js?v=1775990797
+[Sun Apr 12 10:46:37 2026] [::1]:51084 Closing

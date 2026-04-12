@@ -1,0 +1,1417 @@
+PHPUnit 12.5.8 by Sebastian Bergmann and contributors.
+
+Runtime:       PHP 8.3.6
+Configuration: /app/phpunit.xml
+
+...FF...................                                          24 / 24 (100%)
+
+Time: 00:00.011, Memory: 14.00 MB
+
+There were 2 failures:
+
+1) Kentec\Tests\Unit\Controller\TaskControllerTest::testEditEtDeleteApiTaskRenseignentUpdatedby
+editApiTask() et deleteApiTask() doivent renseigner updatedby
+Failed asserting that '<?php\n
+\n
+declare(strict_types=1);\n
+\n
+namespace Kentec\App\Controller;\n
+\n
+use Kentec\App\Model\Task;\n
+use Kentec\App\Repository\AbsenceRepository;\n
+use Kentec\App\Repository\TaskRepository;\n
+use Kentec\Kernel\Database\Repository;\n
+use Kentec\Kernel\Http\AbstractController;\n
+use Kentec\Kernel\Security\InputValidator;\n
+use Kentec\Kernel\Security\Security;\n
+use OpenApi\Attributes as OA;\n
+\n
+class TaskController extends AbstractController\n
+{\n
+\n
+    // Affichage des tasks en mode "vue"\n
+    #[OA\Get(\n
+        path: '/tasks',\n
+        summary: 'Show tasks list page',\n
+        tags: ['Tasks'],\n
+        responses: [\n
+            new OA\Response(response: 200, description: 'Tasks page'),\n
+        ]\n
+    )]\n
+    final public function index(): void\n
+    {\n
+        $taskRepo    = new TaskRepository();\n
+        $userRepo    = new Repository(\Kentec\App\Model\User::class);\n
+        $projectRepo = new Repository(\Kentec\App\Model\Project::class);\n
+        $stateRepo   = new Repository(\Kentec\App\Model\State::class);\n
+\n
+        // Collaborateur : seulement ses tâches assignées\n
+        $currentUser = Security::getUser();\n
+        $role        = $currentUser ? ($currentUser->getRoleName() ?? 'USER') : 'USER';\n
+\n
+        if ($role === 'USER' && $currentUser) {\n
+            $tasks = $taskRepo->customQuery(\n
+                'SELECT t.* FROM task t\n
+                 INNER JOIN usertaskREL ur ON ur.task_id = t.id\n
+                 WHERE ur.user_id = :userId AND t.isactive = true\n
+                 ORDER BY t.id DESC',\n
+                ['userId' => $currentUser->getId()]\n
+            );\n
+        } else {\n
+            $tasks = $taskRepo->customQuery('SELECT * FROM task WHERE isactive = true ORDER BY id DESC');\n
+        }\n
+\n
+        // Récupération de tous les utilisateurs une seule fois\n
+        $users     = $userRepo->getAll() ?? [];\n
+        $usersById = [];\n
+        foreach ($users as $user) {\n
+            $usersById[$user->getId()] = $user;\n
+        }\n
+\n
+        // Récupération de tous les projets une seule fois\n
+        $projects     = $projectRepo->getAll() ?? [];\n
+        $projectsById = [];\n
+        foreach ($projects as $project) {\n
+            $projectsById[$project->getId()] = $project;\n
+        }\n
+\n
+        // Récupération de tous les states une seule fois\n
+        $states     = $stateRepo->getAll() ?? [];\n
+        $statesById = [];\n
+        foreach ($states as $state) {\n
+            $statesById[$state->getId()] = $state->getName();\n
+        }\n
+\n
+        // Récupération des assignations user/task via la table de liaison\n
+        $assignments    = $taskRepo->findAllUserAssignments();\n
+        $taskDevelopers = [];\n
+        foreach ($assignments as $assignment) {\n
+            $taskDevelopers[$assignment['task_id']] = $assignment['user_id'];\n
+        }\n
+\n
+        // Absences actives aujourd'hui\n
+        $absenceRepo   = new AbsenceRepository();\n
+        $absenceRows   = $absenceRepo->findActiveTodayWithDates();\n
+        $absentUserIds = array_column($absenceRows, 'user_id');\n
+        $absenceByUser = array_column($absenceRows, null, 'user_id');\n
+\n
+        // Ajout des informations liées aux tasks\n
+        $tasks = $tasks ?: [];\n
+        foreach ($tasks as &$task) {\n
+            $devId = $taskDevelopers[$task['id']] ?? null;\n
+            if ($devId && isset($usersById[$devId])) {\n
+                $developer = $usersById[$devId];\n
+                $task['developer_id']        = $devId;\n
+                $task['developer_firstname'] = $developer->getFirstname();\n
+                $task['developer_lastname']  = $developer->getLastname();\n
+                $task['developer_email']     = $developer->getEmail();\n
+                $task['dev_absent']          = in_array($devId, $absentUserIds, true);\n
+                $task['dev_absence_start']   = $absenceByUser[$devId]['startdate'] ?? null;\n
+                $task['dev_absence_end']     = $absenceByUser[$devId]['enddate'] ?? null;\n
+            } else {\n
+                $task['dev_absent'] = false;\n
+            }\n
+\n
+            if (!empty($task['project_id']) && isset($projectsById[$task['project_id']])) {\n
+                $project = $projectsById[$task['project_id']];\n
+                $task['project_name'] = $project->getName();\n
+            }\n
+\n
+            if (!empty($task['state_id']) && isset($statesById[$task['state_id']])) {\n
+                $task['state_name'] = $statesById[$task['state_id']];\n
+            }\n
+\n
+            // Normalisation des clés de date pour la vue (qui attend du camelCase)\n
+            if (isset($task['begindate'])) {\n
+                $task['beginDate'] = $task['begindate'];\n
+            }\n
+            if (isset($task['theoricalenddate'])) {\n
+                $task['theoricalEndDate'] = $task['theoricalenddate'];\n
+            }\n
+            if (isset($task['realenddate'])) {\n
+                $task['realEndDate'] = $task['realenddate'];\n
+            }\n
+        }\n
+\n
+        $this->render('task/tasks.php', [\n
+            'pageTitle' => 'Tâches',\n
+            'tasks'     => $tasks,\n
+            'states'    => $states,\n
+            'projects'  => $projects,\n
+            'users'     => array_values($usersById),\n
+            'userRole'  => $role,\n
+        ]);\n
+    }\n
+\n
+    // API - Récupérer les tasks en JSON\n
+    #[OA\Get(\n
+        path: '/api/tasks',\n
+        summary: 'Get all tasks (JSON)',\n
+        tags: ['Tasks'],\n
+        responses: [\n
+            new OA\Response(\n
+                response: 200,\n
+                description: 'Successful response',\n
+                content: new OA\JsonContent(\n
+                    properties: [\n
+                        new OA\Property(property: 'tasks', type: 'array', items: new OA\Items(ref: '#/components/schemas/Task')),\n
+                    ]\n
+                )\n
+            ),\n
+        ]\n
+    )]\n
+    final public function getApiTasks(): void\n
+    {\n
+        if ('GET' === $_SERVER['REQUEST_METHOD']) {\n
+            try {\n
+                $taskRepo    = new TaskRepository();\n
+                $userRepo    = new Repository(\Kentec\App\Model\User::class);\n
+                $projectRepo = new Repository(\Kentec\App\Model\Project::class);\n
+\n
+                $currentUser = Security::getUser();\n
+                $role        = $currentUser ? ($currentUser->getRoleName() ?? 'USER') : 'USER';\n
+\n
+                // USER : seulement ses tâches assignées\n
+                if ($role === 'USER' && $currentUser) {\n
+                    $tasks = $taskRepo->customQuery(\n
+                        'SELECT t.* FROM task t\n
+                         INNER JOIN usertaskREL ur ON ur.task_id = t.id\n
+                         WHERE ur.user_id = :userId AND t.isactive = true\n
+                         ORDER BY t.id DESC',\n
+                        ['userId' => $currentUser->getId()]\n
+                    );\n
+                } else {\n
+                    $tasks = $taskRepo->customQuery('SELECT * FROM task WHERE isactive = true ORDER BY id DESC');\n
+                }\n
+\n
+                // Récupération de tous les utilisateurs une seule fois\n
+                $users     = $userRepo->getAll() ?? [];\n
+                $usersById = [];\n
+                foreach ($users as $user) {\n
+                    $usersById[$user->getId()] = $user;\n
+                }\n
+\n
+                // Récupération de tous les projets une seule fois\n
+                $projects     = $projectRepo->getAll() ?? [];\n
+                $projectsById = [];\n
+                foreach ($projects as $project) {\n
+                    $projectsById[$project->getId()] = $project;\n
+                }\n
+\n
+                // Récupération des assignations user/task via la table de liaison\n
+                $assignments    = $taskRepo->findAllUserAssignments();\n
+                $taskDevelopers = [];\n
+                foreach ($assignments as $assignment) {\n
+                    $taskDevelopers[$assignment['task_id']] = $assignment['user_id'];\n
+                }\n
+\n
+                // Ajout des informations liées aux tasks\n
+                foreach ($tasks as &$task) {\n
+                    $devId = $taskDevelopers[$task['id']] ?? null;\n
+                    if ($devId && isset($usersById[$devId])) {\n
+                        $developer = $usersById[$devId];\n
+                        $task['developer_firstname'] = $developer->getFirstname();\n
+                        $task['developer_lastname'] = $developer->getLastname();\n
+                        $task['developer_email'] = $developer->getEmail();\n
+                    }\n
+\n
+                    if (!empty($task['project_id']) && isset($projectsById[$task['project_id']])) {\n
+                        $project = $projectsById[$task['project_id']];\n
+                        $task['project_name'] = $project->getName();\n
+                    }\n
+                }\n
+\n
+                if (!$tasks) {\n
+                    $this->json([\n
+                        'tasks' => [],\n
+                    ]);\n
+\n
+                    return;\n
+                }\n
+\n
+                $this->json([\n
+                    'tasks' => $tasks,\n
+                ]);\n
+            } catch (\Exception $e) {\n
+                $this->json([\n
+                    'error' => $e->getMessage(),\n
+                ]);\n
+            }\n
+        } else {\n
+            $this->json([\n
+                'success' => false,\n
+                'error' => 'La méthode HTTP doit être GET',\n
+            ]);\n
+        }\n
+    }\n
+\n
+    #[OA\Get(\n
+        path: '/api/task/{taskId}',\n
+        summary: 'Get task by ID (JSON)',\n
+        tags: ['Tasks'],\n
+        parameters: [\n
+            new OA\Parameter(name: 'taskId', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid')),\n
+        ],\n
+        responses: [\n
+            new OA\Response(\n
+                response: 200,\n
+                description: 'Successful response',\n
+                content: new OA\JsonContent(\n
+                    properties: [\n
+                        new OA\Property(property: 'task', ref: '#/components/schemas/Task'),\n
+                    ]\n
+                )\n
+            ),\n
+            new OA\Response(response: 404, description: 'Task not found'),\n
+        ]\n
+    )]\n
+    final public function getApiTask(string $taskId): void\n
+    {\n
+        if ('GET' === $_SERVER['REQUEST_METHOD']) {\n
+            try {\n
+                if (!InputValidator::validateUuid($taskId)) {\n
+                    throw new \Exception('Invalid UUID format');\n
+                }\n
+\n
+                $taskRepo = new TaskRepository();\n
+\n
+                // USER : vérifier qu'il est bien assigné à cette tâche\n
+                $currentUser = Security::getUser();\n
+                $role        = $currentUser ? ($currentUser->getRoleName() ?? 'USER') : 'USER';\n
+\n
+                if ($role === 'USER' && $currentUser) {\n
+                    if (!$taskRepo->isAssignedToUser($taskId, $currentUser->getId())) {\n
+                        $this->jsonError('Accès non autorisé', 403);\n
+                        return;\n
+                    }\n
+                }\n
+\n
+                $task = $taskRepo->getById($taskId);\n
+\n
+                if (!$task) {\n
+                    throw new \Exception('No task found');\n
+                }\n
+                $this->json([\n
+                    'task' => $task->toArray(),\n
+                ]);\n
+            } catch (\Exception $e) {\n
+                $this->json([\n
+                    'error' => $e->getMessage(),\n
+                ]);\n
+            }\n
+        } else {\n
+            $this->json([\n
+                'success' => false,\n
+                'error' => 'La méthode HTTP doit être un GET',\n
+            ]);\n
+        }\n
+    }\n
+\n
+    #[OA\Delete(\n
+        path: '/api/delete/task/{taskId}',\n
+        summary: 'Delete task',\n
+        tags: ['Tasks'],\n
+        parameters: [\n
+            new OA\Parameter(name: 'taskId', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid')),\n
+        ],\n
+        responses: [\n
+            new OA\Response(response: 200, description: 'Task deleted'),\n
+            new OA\Response(response: 404, description: 'Task not found'),\n
+        ]\n
+    )]\n
+    final public function deleteApiTask(string $taskId): void\n
+    {\n
+        $token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';\n
+        if (!Security::verifyCsrfToken($token)) {\n
+            $this->jsonError('Requête invalide (token CSRF manquant ou expiré).', 403);\n
+            return;\n
+        }\n
+\n
+        if ('DELETE' === $_SERVER['REQUEST_METHOD']) {\n
+            try {\n
+                // Validate taskId\n
+                if ('null' === $taskId || '' === $taskId || !InputValidator::validateUuid($taskId)) {\n
+                    $this->json([\n
+                        'success' => false,\n
+                        'error' => 'Invalid task ID',\n
+                    ]);\n
+\n
+                    return;\n
+                }\n
+\n
+                $taskRepo = new TaskRepository();\n
+                $task     = $taskRepo->getById($taskId);\n
+\n
+                if (!$task) {\n
+                    $this->json([\n
+                        'success' => false,\n
+                        'error' => 'Task not found',\n
+                    ]);\n
+\n
+                    return;\n
+                }\n
+\n
+                $currentUser = Security::getUser();\n
+\n
+                // Archiver la tâche (isactive = false) au lieu de la supprimer physiquement\n
+                $taskRepo->softDelete($taskId, $currentUser?->getId());\n
+\n
+                $this->jsonSuccess(['message' => 'Tâche archivée avec succès']);\n
+            } catch (\Exception $e) {\n
+                $this->json([\n
+                    'success' => false,\n
+                    'error' => $e->getMessage(),\n
+                ]);\n
+            }\n
+        } else {\n
+            $this->json([\n
+                'success' => false,\n
+                'error' => 'La méthode HTTP doit être DELETE',\n
+            ]);\n
+        }\n
+    }\n
+\n
+    #[OA\Post(\n
+        path: '/api/add/task',\n
+        summary: 'Add new task (JSON)',\n
+        requestBody: new OA\RequestBody(\n
+            required: true,\n
+            content: new OA\JsonContent(\n
+                required: ['name', 'effortRequired'],\n
+                properties: [\n
+                    new OA\Property(property: 'name', type: 'string'),\n
+                    new OA\Property(property: 'description', type: 'string'),\n
+                    new OA\Property(property: 'type', type: 'string'),\n
+                    new OA\Property(property: 'format', type: 'string'),\n
+                    new OA\Property(property: 'priority', type: 'string'),\n
+                    new OA\Property(property: 'dificulty', type: 'string'),\n
+                    new OA\Property(property: 'effortRequired', type: 'number', format: 'float'),\n
+                    new OA\Property(property: 'projectId', type: 'string', format: 'uuid'),\n
+                    new OA\Property(property: 'stateId', type: 'string', format: 'uuid'),\n
+                    new OA\Property(property: 'beginDate', type: 'string', format: 'date'),\n
+                    new OA\Property(property: 'theoricalEndDate', type: 'string', format: 'date'),\n
+                    new OA\Property(property: 'realEndDate', type: 'string', format: 'date'),\n
+                    new OA\Property(property: 'developerId', type: 'string', format: 'uuid'),\n
+                ]\n
+            )\n
+        ),\n
+        tags: ['Tasks'],\n
+        responses: [\n
+            new OA\Response(response: 200, description: 'Task created'),\n
+            new OA\Response(response: 400, description: 'Invalid input'),\n
+        ]\n
+    )]\n
+    final public function addApiTask(): void\n
+    {\n
+        $token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';\n
+        if (!Security::verifyCsrfToken($token)) {\n
+            $this->jsonError('Requête invalide (token CSRF manquant ou expiré).', 403);\n
+            return;\n
+        }\n
+\n
+        if ('POST' === $_SERVER['REQUEST_METHOD']) {\n
+            try {\n
+                // Récupération des données JSON\n
+                $rawInput = file_get_contents('php://input');\n
+                $inputData = json_decode($rawInput, true);\n
+\n
+                if (!$inputData) {\n
+                    throw new \Exception('No data received');\n
+                }\n
+\n
+                // Validation des champs obligatoires\n
+                if (empty($inputData['name'])) {\n
+                    throw new \Exception('Task name is required');\n
+                }\n
+                if (empty($inputData['type'])) {\n
+                    throw new \Exception('Le type de la tâche est obligatoire.');\n
+                }\n
+\n
+                $taskRepo = new TaskRepository();\n
+                $task     = new Task();\n
+\n
+                // Assignation des valeurs\n
+                $task->setName($inputData['name']);\n
+                $task->setDescription($inputData['description'] ?? null);\n
+                $task->setType($inputData['type'] ?? null);\n
+                $task->setFormat($inputData['format'] ?? null);\n
+                $task->setPriority($inputData['priority'] ?? null);\n
+                $task->setDifficulty($inputData['dificulty'] ?? $inputData['difficulty'] ?? null);\n
+\n
+\n
+                // Validate effortRequired\n
+                if (!isset($inputData['effortRequired']) || '' === $inputData['effortRequired'] || null === $inputData['effortRequired']) {\n
+                    throw new \Exception('Le champ effortRequired est obligatoire.');\n
+                }\n
+                $effort = floatval($inputData['effortRequired']);\n
+                if ($effort <= 0 || $effort > 99.99) {\n
+                    throw new \Exception("L'effort doit être compris entre 0.01 et 99.99 heures.");\n
+                }\n
+                $task->setEffortrequired($effort);\n
+\n
+                // Validate Project ID UUID\n
+                if (!empty($inputData['projectId'])) {\n
+                    if (!InputValidator::validateUuid($inputData['projectId'])) {\n
+                        throw new \Exception('Invalid Project ID (must be a valid UUID)');\n
+                    }\n
+                    $task->setProjectId($inputData['projectId']);\n
+                }\n
+\n
+                // Validate State ID UUID\n
+                if (!empty($inputData['stateId'])) {\n
+                    if (!InputValidator::validateUuid($inputData['stateId'])) {\n
+                        throw new \Exception('Invalid State ID (must be a valid UUID)');\n
+                    }\n
+                    $task->setStateId($inputData['stateId']);\n
+                }\n
+\n
+                // Gestion des dates\n
+                if (!empty($inputData['beginDate'])) {\n
+                    $task->setBeginDate(new \DateTime($inputData['beginDate']));\n
+                }\n
+                if (empty($inputData['theoricalEndDate'])) {\n
+                    throw new \Exception("L'échéance théorique est obligatoire.");\n
+                }\n
+                $task->setTheoreticalEndDate(new \DateTime($inputData['theoricalEndDate']));\n
+                if (!empty($inputData['realEndDate'])) {\n
+                    $task->setRealEndDate(new \DateTime($inputData['realEndDate']));\n
+                }\n
+\n
+                // Attribution automatique du statut "En attente"\n
+                $projectRepoForState = new ProjectRepository();\n
+                $defaultStateId = $projectRepoForState->findDefaultStateId();\n
+                if ($defaultStateId !== null) {\n
+                    $task->setStateId($defaultStateId);\n
+                }\n
+\n
+                // Sauvegarde avec récupération de l'ID généré\n
+                $currentUser = Security::getUser();\n
+                if ($currentUser) {\n
+                    $task->setCreatedby($currentUser->getId());\n
+                    $task->setUpdatedby($currentUser->getId());\n
+                }\n
+                $newTaskId = $taskRepo->insertAndReturnId($task);\n
+\n
+                // Assignation du développeur\n
+                if ($newTaskId && !empty($inputData['developerId']) && InputValidator::validateUuid($inputData['developerId'])) {\n
+                    $taskRepo->deleteUserAssignment($newTaskId);\n
+                    $taskRepo->insertUserAssignment($inputData['developerId'], $newTaskId);\n
+                }\n
+\n
+                $this->jsonSuccess([\n
+                    'message' => 'Task created successfully',\n
+                    'task' => $task->toArray(),\n
+                ]);\n
+            } catch (\Exception $e) {\n
+                $this->json([\n
+                    'success' => false,\n
+                    'error' => $e->getMessage(),\n
+                ]);\n
+            }\n
+        } else {\n
+            $this->json([\n
+                'success' => false,\n
+                'error' => 'La méthode HTTP doit être POST',\n
+            ]);\n
+        }\n
+    }\n
+\n
+    #[OA\Put(\n
+        path: '/api/edit/task/{taskId}',\n
+        summary: 'Edit task (JSON)',\n
+        requestBody: new OA\RequestBody(\n
+            required: true,\n
+            content: new OA\JsonContent(\n
+                properties: [\n
+                    new OA\Property(property: 'name', type: 'string'),\n
+                    new OA\Property(property: 'description', type: 'string'),\n
+                    new OA\Property(property: 'type', type: 'string'),\n
+                    new OA\Property(property: 'format', type: 'string'),\n
+                    new OA\Property(property: 'priority', type: 'string'),\n
+                    new OA\Property(property: 'dificulty', type: 'string'),\n
+                    new OA\Property(property: 'effortRequired', type: 'number', format: 'float'),\n
+                    new OA\Property(property: 'effortMade', type: 'number', format: 'float'),\n
+                    new OA\Property(property: 'projectId', type: 'string', format: 'uuid'),\n
+                    new OA\Property(property: 'stateId', type: 'string', format: 'uuid'),\n
+                    new OA\Property(property: 'beginDate', type: 'string', format: 'date'),\n
+                    new OA\Property(property: 'theoricalEndDate', type: 'string', format: 'date'),\n
+                    new OA\Property(property: 'realEndDate', type: 'string', format: 'date'),\n
+                    new OA\Property(property: 'developerId', type: 'string', format: 'uuid'),\n
+                ]\n
+            )\n
+        ),\n
+        tags: ['Tasks'],\n
+        parameters: [\n
+            new OA\Parameter(name: 'taskId', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid')),\n
+        ],\n
+        responses: [\n
+            new OA\Response(response: 200, description: 'Task updated'),\n
+            new OA\Response(response: 404, description: 'Task not found'),\n
+        ]\n
+    )]\n
+    final public function editApiTask(string $taskId): void\n
+    {\n
+        $token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';\n
+        if (!Security::verifyCsrfToken($token)) {\n
+            $this->jsonError('Requête invalide (token CSRF manquant ou expiré).', 403);\n
+            return;\n
+        }\n
+\n
+        if ('PUT' === $_SERVER['REQUEST_METHOD']) {\n
+            try {\n
+                if (!InputValidator::validateUuid($taskId)) {\n
+                    throw new \Exception('Invalid UUID format');\n
+                }\n
+\n
+                // Récupération des données JSON\n
+                $rawInput = file_get_contents('php://input');\n
+                $inputData = json_decode($rawInput, true);\n
+\n
+                if (!$inputData) {\n
+                    throw new \Exception('No data received');\n
+                }\n
+\n
+                $taskRepo = new TaskRepository();\n
+                $task     = $taskRepo->getById($taskId);\n
+\n
+                if (!$task) {\n
+                    throw new \Exception('Task not found');\n
+                }\n
+\n
+                // Mise à jour des champs\n
+                if (isset($inputData['name'])) {\n
+                    $task->setName($inputData['name']);\n
+                }\n
+                if (isset($inputData['description'])) {\n
+                    $task->setDescription($inputData['description']);\n
+                }\n
+                if (isset($inputData['type'])) {\n
+                    $task->setType($inputData['type']);\n
+                }\n
+                if (isset($inputData['format'])) {\n
+                    $task->setFormat($inputData['format']);\n
+                }\n
+                if (isset($inputData['priority'])) {\n
+                    $task->setPriority($inputData['priority']);\n
+                }\n
+                if (isset($inputData['dificulty'])) {\n
+                    $task->setDifficulty($inputData['dificulty'] ?? $inputData['difficulty']);\n
+                }\n
+                if (isset($inputData['effortRequired'])) {\n
+                    $effort = floatval($inputData['effortRequired']);\n
+                    if ($effort <= 0 || $effort > 99.99) {\n
+                        throw new \Exception("L'effort doit être compris entre 0.01 et 99.99 heures.");\n
+                    }\n
+                    $task->setEffortrequired($effort);\n
+                }\n
+                if (isset($inputData['effortMade'])) {\n
+                    $effortMade = floatval($inputData['effortMade']);\n
+                    if ($effortMade <= 0) {\n
+                        throw new \Exception("L'effort réel doit être supérieur à 0.");\n
+                    }\n
+                    $task->setEffortmade($effortMade);\n
+                }\n
+                if (!empty($inputData['projectId'])) {\n
+                    if (!InputValidator::validateUuid($inputData['projectId'])) {\n
+                        throw new \Exception('Invalid Project ID (must be a valid UUID)');\n
+                    }\n
+                    $task->setProjectId($inputData['projectId']);\n
+                }\n
+                if (!empty($inputData['stateId'])) {\n
+                    if (!InputValidator::validateUuid($inputData['stateId'])) {\n
+                        throw new \Exception('Invalid State ID (must be a valid UUID)');\n
+                    }\n
+                    $task->setStateId($inputData['stateId']);\n
+                }\n
+\n
+                // Gestion des dates\n
+                if (isset($inputData['beginDate'])) {\n
+                    $task->setBeginDate($inputData['beginDate'] ? new \DateTime($inputData['beginDate']) : null);\n
+                }\n
+                if (isset($inputData['theoricalEndDate'])) {\n
+                    $task->setTheoreticalEndDate($inputData['theoricalEndDate'] ? new \DateTime($inputData['theoricalEndDate']) : null);\n
+                }\n
+                if (isset($inputData['realEndDate'])) {\n
+                    $task->setRealEndDate($inputData['realEndDate'] ? new \DateTime($inputData['realEndDate']) : null);\n
+                }\n
+\n
+                // Sauvegarde\n
+                $task->setUpdatedat((new \DateTime())->format('Y-m-d H:i:s'));\n
+                $currentUser = Security::getUser();\n
+                if ($currentUser) {\n
+                    $task->setUpdatedby($currentUser->getId());\n
+                }\n
+                $taskRepo->update($task);\n
+\n
+                // Assignation du développeur\n
+                if (!empty($inputData['developerId']) && InputValidator::validateUuid($inputData['developerId'])) {\n
+                    $taskRepo->deleteUserAssignment($taskId);\n
+                    $taskRepo->insertUserAssignment($inputData['developerId'], $taskId);\n
+                }\n
+\n
+                $this->jsonSuccess([\n
+                    'message' => 'Task updated successfully',\n
+                    'task' => $task->toArray(),\n
+                ]);\n
+            } catch (\Exception $e) {\n
+                $this->json([\n
+                    'success' => false,\n
+                    'error' => $e->getMessage(),\n
+                ]);\n
+            }\n
+        } else {\n
+            $this->json([\n
+                'success' => false,\n
+                'error' => 'La méthode HTTP doit être PUT',\n
+            ]);\n
+        }\n
+    }\n
+\n
+    #[OA\Get(\n
+        path: '/api/states',\n
+        summary: 'Get all task states (JSON)',\n
+        tags: ['Tasks'],\n
+        responses: [\n
+            new OA\Response(\n
+                response: 200,\n
+                description: 'Successful response',\n
+                content: new OA\JsonContent(\n
+                    properties: [\n
+                        new OA\Property(property: 'states', type: 'array', items: new OA\Items(ref: '#/components/schemas/State')),\n
+                    ]\n
+                )\n
+            ),\n
+        ]\n
+    )]\n
+    final public function getApiStates(): void\n
+    {\n
+        try {\n
+            $stateRepo = new Repository(\Kentec\App\Model\State::class);\n
+            $states = $stateRepo->getAll();\n
+\n
+            $statesArray = [];\n
+            if ($states) {\n
+                foreach ($states as $state) {\n
+                    $statesArray[] = $state->toArray();\n
+                }\n
+            }\n
+\n
+            $this->jsonSuccess([\n
+                'states' => $statesArray,\n
+            ]);\n
+        } catch (\Exception $e) {\n
+            $this->json([\n
+                'success' => false,\n
+                'error' => $e->getMessage(),\n
+            ]);\n
+        }\n
+    }\n
+}\n
+' [UTF-8](length: 28304) contains "updatedby" [ASCII](length: 9).
+
+/app/tests/Unit/Controller/TaskControllerTest.php:110
+
+2) Kentec\Tests\Unit\Controller\TaskControllerTest::testEditApiTaskMetAJourUpdatedat
+editApiTask() et deleteApiTask() doivent mettre à jour updatedat via NOW()
+Failed asserting that '<?php\n
+\n
+declare(strict_types=1);\n
+\n
+namespace Kentec\App\Controller;\n
+\n
+use Kentec\App\Model\Task;\n
+use Kentec\App\Repository\AbsenceRepository;\n
+use Kentec\App\Repository\TaskRepository;\n
+use Kentec\Kernel\Database\Repository;\n
+use Kentec\Kernel\Http\AbstractController;\n
+use Kentec\Kernel\Security\InputValidator;\n
+use Kentec\Kernel\Security\Security;\n
+use OpenApi\Attributes as OA;\n
+\n
+class TaskController extends AbstractController\n
+{\n
+\n
+    // Affichage des tasks en mode "vue"\n
+    #[OA\Get(\n
+        path: '/tasks',\n
+        summary: 'Show tasks list page',\n
+        tags: ['Tasks'],\n
+        responses: [\n
+            new OA\Response(response: 200, description: 'Tasks page'),\n
+        ]\n
+    )]\n
+    final public function index(): void\n
+    {\n
+        $taskRepo    = new TaskRepository();\n
+        $userRepo    = new Repository(\Kentec\App\Model\User::class);\n
+        $projectRepo = new Repository(\Kentec\App\Model\Project::class);\n
+        $stateRepo   = new Repository(\Kentec\App\Model\State::class);\n
+\n
+        // Collaborateur : seulement ses tâches assignées\n
+        $currentUser = Security::getUser();\n
+        $role        = $currentUser ? ($currentUser->getRoleName() ?? 'USER') : 'USER';\n
+\n
+        if ($role === 'USER' && $currentUser) {\n
+            $tasks = $taskRepo->customQuery(\n
+                'SELECT t.* FROM task t\n
+                 INNER JOIN usertaskREL ur ON ur.task_id = t.id\n
+                 WHERE ur.user_id = :userId AND t.isactive = true\n
+                 ORDER BY t.id DESC',\n
+                ['userId' => $currentUser->getId()]\n
+            );\n
+        } else {\n
+            $tasks = $taskRepo->customQuery('SELECT * FROM task WHERE isactive = true ORDER BY id DESC');\n
+        }\n
+\n
+        // Récupération de tous les utilisateurs une seule fois\n
+        $users     = $userRepo->getAll() ?? [];\n
+        $usersById = [];\n
+        foreach ($users as $user) {\n
+            $usersById[$user->getId()] = $user;\n
+        }\n
+\n
+        // Récupération de tous les projets une seule fois\n
+        $projects     = $projectRepo->getAll() ?? [];\n
+        $projectsById = [];\n
+        foreach ($projects as $project) {\n
+            $projectsById[$project->getId()] = $project;\n
+        }\n
+\n
+        // Récupération de tous les states une seule fois\n
+        $states     = $stateRepo->getAll() ?? [];\n
+        $statesById = [];\n
+        foreach ($states as $state) {\n
+            $statesById[$state->getId()] = $state->getName();\n
+        }\n
+\n
+        // Récupération des assignations user/task via la table de liaison\n
+        $assignments    = $taskRepo->findAllUserAssignments();\n
+        $taskDevelopers = [];\n
+        foreach ($assignments as $assignment) {\n
+            $taskDevelopers[$assignment['task_id']] = $assignment['user_id'];\n
+        }\n
+\n
+        // Absences actives aujourd'hui\n
+        $absenceRepo   = new AbsenceRepository();\n
+        $absenceRows   = $absenceRepo->findActiveTodayWithDates();\n
+        $absentUserIds = array_column($absenceRows, 'user_id');\n
+        $absenceByUser = array_column($absenceRows, null, 'user_id');\n
+\n
+        // Ajout des informations liées aux tasks\n
+        $tasks = $tasks ?: [];\n
+        foreach ($tasks as &$task) {\n
+            $devId = $taskDevelopers[$task['id']] ?? null;\n
+            if ($devId && isset($usersById[$devId])) {\n
+                $developer = $usersById[$devId];\n
+                $task['developer_id']        = $devId;\n
+                $task['developer_firstname'] = $developer->getFirstname();\n
+                $task['developer_lastname']  = $developer->getLastname();\n
+                $task['developer_email']     = $developer->getEmail();\n
+                $task['dev_absent']          = in_array($devId, $absentUserIds, true);\n
+                $task['dev_absence_start']   = $absenceByUser[$devId]['startdate'] ?? null;\n
+                $task['dev_absence_end']     = $absenceByUser[$devId]['enddate'] ?? null;\n
+            } else {\n
+                $task['dev_absent'] = false;\n
+            }\n
+\n
+            if (!empty($task['project_id']) && isset($projectsById[$task['project_id']])) {\n
+                $project = $projectsById[$task['project_id']];\n
+                $task['project_name'] = $project->getName();\n
+            }\n
+\n
+            if (!empty($task['state_id']) && isset($statesById[$task['state_id']])) {\n
+                $task['state_name'] = $statesById[$task['state_id']];\n
+            }\n
+\n
+            // Normalisation des clés de date pour la vue (qui attend du camelCase)\n
+            if (isset($task['begindate'])) {\n
+                $task['beginDate'] = $task['begindate'];\n
+            }\n
+            if (isset($task['theoricalenddate'])) {\n
+                $task['theoricalEndDate'] = $task['theoricalenddate'];\n
+            }\n
+            if (isset($task['realenddate'])) {\n
+                $task['realEndDate'] = $task['realenddate'];\n
+            }\n
+        }\n
+\n
+        $this->render('task/tasks.php', [\n
+            'pageTitle' => 'Tâches',\n
+            'tasks'     => $tasks,\n
+            'states'    => $states,\n
+            'projects'  => $projects,\n
+            'users'     => array_values($usersById),\n
+            'userRole'  => $role,\n
+        ]);\n
+    }\n
+\n
+    // API - Récupérer les tasks en JSON\n
+    #[OA\Get(\n
+        path: '/api/tasks',\n
+        summary: 'Get all tasks (JSON)',\n
+        tags: ['Tasks'],\n
+        responses: [\n
+            new OA\Response(\n
+                response: 200,\n
+                description: 'Successful response',\n
+                content: new OA\JsonContent(\n
+                    properties: [\n
+                        new OA\Property(property: 'tasks', type: 'array', items: new OA\Items(ref: '#/components/schemas/Task')),\n
+                    ]\n
+                )\n
+            ),\n
+        ]\n
+    )]\n
+    final public function getApiTasks(): void\n
+    {\n
+        if ('GET' === $_SERVER['REQUEST_METHOD']) {\n
+            try {\n
+                $taskRepo    = new TaskRepository();\n
+                $userRepo    = new Repository(\Kentec\App\Model\User::class);\n
+                $projectRepo = new Repository(\Kentec\App\Model\Project::class);\n
+\n
+                $currentUser = Security::getUser();\n
+                $role        = $currentUser ? ($currentUser->getRoleName() ?? 'USER') : 'USER';\n
+\n
+                // USER : seulement ses tâches assignées\n
+                if ($role === 'USER' && $currentUser) {\n
+                    $tasks = $taskRepo->customQuery(\n
+                        'SELECT t.* FROM task t\n
+                         INNER JOIN usertaskREL ur ON ur.task_id = t.id\n
+                         WHERE ur.user_id = :userId AND t.isactive = true\n
+                         ORDER BY t.id DESC',\n
+                        ['userId' => $currentUser->getId()]\n
+                    );\n
+                } else {\n
+                    $tasks = $taskRepo->customQuery('SELECT * FROM task WHERE isactive = true ORDER BY id DESC');\n
+                }\n
+\n
+                // Récupération de tous les utilisateurs une seule fois\n
+                $users     = $userRepo->getAll() ?? [];\n
+                $usersById = [];\n
+                foreach ($users as $user) {\n
+                    $usersById[$user->getId()] = $user;\n
+                }\n
+\n
+                // Récupération de tous les projets une seule fois\n
+                $projects     = $projectRepo->getAll() ?? [];\n
+                $projectsById = [];\n
+                foreach ($projects as $project) {\n
+                    $projectsById[$project->getId()] = $project;\n
+                }\n
+\n
+                // Récupération des assignations user/task via la table de liaison\n
+                $assignments    = $taskRepo->findAllUserAssignments();\n
+                $taskDevelopers = [];\n
+                foreach ($assignments as $assignment) {\n
+                    $taskDevelopers[$assignment['task_id']] = $assignment['user_id'];\n
+                }\n
+\n
+                // Ajout des informations liées aux tasks\n
+                foreach ($tasks as &$task) {\n
+                    $devId = $taskDevelopers[$task['id']] ?? null;\n
+                    if ($devId && isset($usersById[$devId])) {\n
+                        $developer = $usersById[$devId];\n
+                        $task['developer_firstname'] = $developer->getFirstname();\n
+                        $task['developer_lastname'] = $developer->getLastname();\n
+                        $task['developer_email'] = $developer->getEmail();\n
+                    }\n
+\n
+                    if (!empty($task['project_id']) && isset($projectsById[$task['project_id']])) {\n
+                        $project = $projectsById[$task['project_id']];\n
+                        $task['project_name'] = $project->getName();\n
+                    }\n
+                }\n
+\n
+                if (!$tasks) {\n
+                    $this->json([\n
+                        'tasks' => [],\n
+                    ]);\n
+\n
+                    return;\n
+                }\n
+\n
+                $this->json([\n
+                    'tasks' => $tasks,\n
+                ]);\n
+            } catch (\Exception $e) {\n
+                $this->json([\n
+                    'error' => $e->getMessage(),\n
+                ]);\n
+            }\n
+        } else {\n
+            $this->json([\n
+                'success' => false,\n
+                'error' => 'La méthode HTTP doit être GET',\n
+            ]);\n
+        }\n
+    }\n
+\n
+    #[OA\Get(\n
+        path: '/api/task/{taskId}',\n
+        summary: 'Get task by ID (JSON)',\n
+        tags: ['Tasks'],\n
+        parameters: [\n
+            new OA\Parameter(name: 'taskId', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid')),\n
+        ],\n
+        responses: [\n
+            new OA\Response(\n
+                response: 200,\n
+                description: 'Successful response',\n
+                content: new OA\JsonContent(\n
+                    properties: [\n
+                        new OA\Property(property: 'task', ref: '#/components/schemas/Task'),\n
+                    ]\n
+                )\n
+            ),\n
+            new OA\Response(response: 404, description: 'Task not found'),\n
+        ]\n
+    )]\n
+    final public function getApiTask(string $taskId): void\n
+    {\n
+        if ('GET' === $_SERVER['REQUEST_METHOD']) {\n
+            try {\n
+                if (!InputValidator::validateUuid($taskId)) {\n
+                    throw new \Exception('Invalid UUID format');\n
+                }\n
+\n
+                $taskRepo = new TaskRepository();\n
+\n
+                // USER : vérifier qu'il est bien assigné à cette tâche\n
+                $currentUser = Security::getUser();\n
+                $role        = $currentUser ? ($currentUser->getRoleName() ?? 'USER') : 'USER';\n
+\n
+                if ($role === 'USER' && $currentUser) {\n
+                    if (!$taskRepo->isAssignedToUser($taskId, $currentUser->getId())) {\n
+                        $this->jsonError('Accès non autorisé', 403);\n
+                        return;\n
+                    }\n
+                }\n
+\n
+                $task = $taskRepo->getById($taskId);\n
+\n
+                if (!$task) {\n
+                    throw new \Exception('No task found');\n
+                }\n
+                $this->json([\n
+                    'task' => $task->toArray(),\n
+                ]);\n
+            } catch (\Exception $e) {\n
+                $this->json([\n
+                    'error' => $e->getMessage(),\n
+                ]);\n
+            }\n
+        } else {\n
+            $this->json([\n
+                'success' => false,\n
+                'error' => 'La méthode HTTP doit être un GET',\n
+            ]);\n
+        }\n
+    }\n
+\n
+    #[OA\Delete(\n
+        path: '/api/delete/task/{taskId}',\n
+        summary: 'Delete task',\n
+        tags: ['Tasks'],\n
+        parameters: [\n
+            new OA\Parameter(name: 'taskId', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid')),\n
+        ],\n
+        responses: [\n
+            new OA\Response(response: 200, description: 'Task deleted'),\n
+            new OA\Response(response: 404, description: 'Task not found'),\n
+        ]\n
+    )]\n
+    final public function deleteApiTask(string $taskId): void\n
+    {\n
+        $token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';\n
+        if (!Security::verifyCsrfToken($token)) {\n
+            $this->jsonError('Requête invalide (token CSRF manquant ou expiré).', 403);\n
+            return;\n
+        }\n
+\n
+        if ('DELETE' === $_SERVER['REQUEST_METHOD']) {\n
+            try {\n
+                // Validate taskId\n
+                if ('null' === $taskId || '' === $taskId || !InputValidator::validateUuid($taskId)) {\n
+                    $this->json([\n
+                        'success' => false,\n
+                        'error' => 'Invalid task ID',\n
+                    ]);\n
+\n
+                    return;\n
+                }\n
+\n
+                $taskRepo = new TaskRepository();\n
+                $task     = $taskRepo->getById($taskId);\n
+\n
+                if (!$task) {\n
+                    $this->json([\n
+                        'success' => false,\n
+                        'error' => 'Task not found',\n
+                    ]);\n
+\n
+                    return;\n
+                }\n
+\n
+                $currentUser = Security::getUser();\n
+\n
+                // Archiver la tâche (isactive = false) au lieu de la supprimer physiquement\n
+                $taskRepo->softDelete($taskId, $currentUser?->getId());\n
+\n
+                $this->jsonSuccess(['message' => 'Tâche archivée avec succès']);\n
+            } catch (\Exception $e) {\n
+                $this->json([\n
+                    'success' => false,\n
+                    'error' => $e->getMessage(),\n
+                ]);\n
+            }\n
+        } else {\n
+            $this->json([\n
+                'success' => false,\n
+                'error' => 'La méthode HTTP doit être DELETE',\n
+            ]);\n
+        }\n
+    }\n
+\n
+    #[OA\Post(\n
+        path: '/api/add/task',\n
+        summary: 'Add new task (JSON)',\n
+        requestBody: new OA\RequestBody(\n
+            required: true,\n
+            content: new OA\JsonContent(\n
+                required: ['name', 'effortRequired'],\n
+                properties: [\n
+                    new OA\Property(property: 'name', type: 'string'),\n
+                    new OA\Property(property: 'description', type: 'string'),\n
+                    new OA\Property(property: 'type', type: 'string'),\n
+                    new OA\Property(property: 'format', type: 'string'),\n
+                    new OA\Property(property: 'priority', type: 'string'),\n
+                    new OA\Property(property: 'dificulty', type: 'string'),\n
+                    new OA\Property(property: 'effortRequired', type: 'number', format: 'float'),\n
+                    new OA\Property(property: 'projectId', type: 'string', format: 'uuid'),\n
+                    new OA\Property(property: 'stateId', type: 'string', format: 'uuid'),\n
+                    new OA\Property(property: 'beginDate', type: 'string', format: 'date'),\n
+                    new OA\Property(property: 'theoricalEndDate', type: 'string', format: 'date'),\n
+                    new OA\Property(property: 'realEndDate', type: 'string', format: 'date'),\n
+                    new OA\Property(property: 'developerId', type: 'string', format: 'uuid'),\n
+                ]\n
+            )\n
+        ),\n
+        tags: ['Tasks'],\n
+        responses: [\n
+            new OA\Response(response: 200, description: 'Task created'),\n
+            new OA\Response(response: 400, description: 'Invalid input'),\n
+        ]\n
+    )]\n
+    final public function addApiTask(): void\n
+    {\n
+        $token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';\n
+        if (!Security::verifyCsrfToken($token)) {\n
+            $this->jsonError('Requête invalide (token CSRF manquant ou expiré).', 403);\n
+            return;\n
+        }\n
+\n
+        if ('POST' === $_SERVER['REQUEST_METHOD']) {\n
+            try {\n
+                // Récupération des données JSON\n
+                $rawInput = file_get_contents('php://input');\n
+                $inputData = json_decode($rawInput, true);\n
+\n
+                if (!$inputData) {\n
+                    throw new \Exception('No data received');\n
+                }\n
+\n
+                // Validation des champs obligatoires\n
+                if (empty($inputData['name'])) {\n
+                    throw new \Exception('Task name is required');\n
+                }\n
+                if (empty($inputData['type'])) {\n
+                    throw new \Exception('Le type de la tâche est obligatoire.');\n
+                }\n
+\n
+                $taskRepo = new TaskRepository();\n
+                $task     = new Task();\n
+\n
+                // Assignation des valeurs\n
+                $task->setName($inputData['name']);\n
+                $task->setDescription($inputData['description'] ?? null);\n
+                $task->setType($inputData['type'] ?? null);\n
+                $task->setFormat($inputData['format'] ?? null);\n
+                $task->setPriority($inputData['priority'] ?? null);\n
+                $task->setDifficulty($inputData['dificulty'] ?? $inputData['difficulty'] ?? null);\n
+\n
+\n
+                // Validate effortRequired\n
+                if (!isset($inputData['effortRequired']) || '' === $inputData['effortRequired'] || null === $inputData['effortRequired']) {\n
+                    throw new \Exception('Le champ effortRequired est obligatoire.');\n
+                }\n
+                $effort = floatval($inputData['effortRequired']);\n
+                if ($effort <= 0 || $effort > 99.99) {\n
+                    throw new \Exception("L'effort doit être compris entre 0.01 et 99.99 heures.");\n
+                }\n
+                $task->setEffortrequired($effort);\n
+\n
+                // Validate Project ID UUID\n
+                if (!empty($inputData['projectId'])) {\n
+                    if (!InputValidator::validateUuid($inputData['projectId'])) {\n
+                        throw new \Exception('Invalid Project ID (must be a valid UUID)');\n
+                    }\n
+                    $task->setProjectId($inputData['projectId']);\n
+                }\n
+\n
+                // Validate State ID UUID\n
+                if (!empty($inputData['stateId'])) {\n
+                    if (!InputValidator::validateUuid($inputData['stateId'])) {\n
+                        throw new \Exception('Invalid State ID (must be a valid UUID)');\n
+                    }\n
+                    $task->setStateId($inputData['stateId']);\n
+                }\n
+\n
+                // Gestion des dates\n
+                if (!empty($inputData['beginDate'])) {\n
+                    $task->setBeginDate(new \DateTime($inputData['beginDate']));\n
+                }\n
+                if (empty($inputData['theoricalEndDate'])) {\n
+                    throw new \Exception("L'échéance théorique est obligatoire.");\n
+                }\n
+                $task->setTheoreticalEndDate(new \DateTime($inputData['theoricalEndDate']));\n
+                if (!empty($inputData['realEndDate'])) {\n
+                    $task->setRealEndDate(new \DateTime($inputData['realEndDate']));\n
+                }\n
+\n
+                // Attribution automatique du statut "En attente"\n
+                $projectRepoForState = new ProjectRepository();\n
+                $defaultStateId = $projectRepoForState->findDefaultStateId();\n
+                if ($defaultStateId !== null) {\n
+                    $task->setStateId($defaultStateId);\n
+                }\n
+\n
+                // Sauvegarde avec récupération de l'ID généré\n
+                $currentUser = Security::getUser();\n
+                if ($currentUser) {\n
+                    $task->setCreatedby($currentUser->getId());\n
+                    $task->setUpdatedby($currentUser->getId());\n
+                }\n
+                $newTaskId = $taskRepo->insertAndReturnId($task);\n
+\n
+                // Assignation du développeur\n
+                if ($newTaskId && !empty($inputData['developerId']) && InputValidator::validateUuid($inputData['developerId'])) {\n
+                    $taskRepo->deleteUserAssignment($newTaskId);\n
+                    $taskRepo->insertUserAssignment($inputData['developerId'], $newTaskId);\n
+                }\n
+\n
+                $this->jsonSuccess([\n
+                    'message' => 'Task created successfully',\n
+                    'task' => $task->toArray(),\n
+                ]);\n
+            } catch (\Exception $e) {\n
+                $this->json([\n
+                    'success' => false,\n
+                    'error' => $e->getMessage(),\n
+                ]);\n
+            }\n
+        } else {\n
+            $this->json([\n
+                'success' => false,\n
+                'error' => 'La méthode HTTP doit être POST',\n
+            ]);\n
+        }\n
+    }\n
+\n
+    #[OA\Put(\n
+        path: '/api/edit/task/{taskId}',\n
+        summary: 'Edit task (JSON)',\n
+        requestBody: new OA\RequestBody(\n
+            required: true,\n
+            content: new OA\JsonContent(\n
+                properties: [\n
+                    new OA\Property(property: 'name', type: 'string'),\n
+                    new OA\Property(property: 'description', type: 'string'),\n
+                    new OA\Property(property: 'type', type: 'string'),\n
+                    new OA\Property(property: 'format', type: 'string'),\n
+                    new OA\Property(property: 'priority', type: 'string'),\n
+                    new OA\Property(property: 'dificulty', type: 'string'),\n
+                    new OA\Property(property: 'effortRequired', type: 'number', format: 'float'),\n
+                    new OA\Property(property: 'effortMade', type: 'number', format: 'float'),\n
+                    new OA\Property(property: 'projectId', type: 'string', format: 'uuid'),\n
+                    new OA\Property(property: 'stateId', type: 'string', format: 'uuid'),\n
+                    new OA\Property(property: 'beginDate', type: 'string', format: 'date'),\n
+                    new OA\Property(property: 'theoricalEndDate', type: 'string', format: 'date'),\n
+                    new OA\Property(property: 'realEndDate', type: 'string', format: 'date'),\n
+                    new OA\Property(property: 'developerId', type: 'string', format: 'uuid'),\n
+                ]\n
+            )\n
+        ),\n
+        tags: ['Tasks'],\n
+        parameters: [\n
+            new OA\Parameter(name: 'taskId', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid')),\n
+        ],\n
+        responses: [\n
+            new OA\Response(response: 200, description: 'Task updated'),\n
+            new OA\Response(response: 404, description: 'Task not found'),\n
+        ]\n
+    )]\n
+    final public function editApiTask(string $taskId): void\n
+    {\n
+        $token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';\n
+        if (!Security::verifyCsrfToken($token)) {\n
+            $this->jsonError('Requête invalide (token CSRF manquant ou expiré).', 403);\n
+            return;\n
+        }\n
+\n
+        if ('PUT' === $_SERVER['REQUEST_METHOD']) {\n
+            try {\n
+                if (!InputValidator::validateUuid($taskId)) {\n
+                    throw new \Exception('Invalid UUID format');\n
+                }\n
+\n
+                // Récupération des données JSON\n
+                $rawInput = file_get_contents('php://input');\n
+                $inputData = json_decode($rawInput, true);\n
+\n
+                if (!$inputData) {\n
+                    throw new \Exception('No data received');\n
+                }\n
+\n
+                $taskRepo = new TaskRepository();\n
+                $task     = $taskRepo->getById($taskId);\n
+\n
+                if (!$task) {\n
+                    throw new \Exception('Task not found');\n
+                }\n
+\n
+                // Mise à jour des champs\n
+                if (isset($inputData['name'])) {\n
+                    $task->setName($inputData['name']);\n
+                }\n
+                if (isset($inputData['description'])) {\n
+                    $task->setDescription($inputData['description']);\n
+                }\n
+                if (isset($inputData['type'])) {\n
+                    $task->setType($inputData['type']);\n
+                }\n
+                if (isset($inputData['format'])) {\n
+                    $task->setFormat($inputData['format']);\n
+                }\n
+                if (isset($inputData['priority'])) {\n
+                    $task->setPriority($inputData['priority']);\n
+                }\n
+                if (isset($inputData['dificulty'])) {\n
+                    $task->setDifficulty($inputData['dificulty'] ?? $inputData['difficulty']);\n
+                }\n
+                if (isset($inputData['effortRequired'])) {\n
+                    $effort = floatval($inputData['effortRequired']);\n
+                    if ($effort <= 0 || $effort > 99.99) {\n
+                        throw new \Exception("L'effort doit être compris entre 0.01 et 99.99 heures.");\n
+                    }\n
+                    $task->setEffortrequired($effort);\n
+                }\n
+                if (isset($inputData['effortMade'])) {\n
+                    $effortMade = floatval($inputData['effortMade']);\n
+                    if ($effortMade <= 0) {\n
+                        throw new \Exception("L'effort réel doit être supérieur à 0.");\n
+                    }\n
+                    $task->setEffortmade($effortMade);\n
+                }\n
+                if (!empty($inputData['projectId'])) {\n
+                    if (!InputValidator::validateUuid($inputData['projectId'])) {\n
+                        throw new \Exception('Invalid Project ID (must be a valid UUID)');\n
+                    }\n
+                    $task->setProjectId($inputData['projectId']);\n
+                }\n
+                if (!empty($inputData['stateId'])) {\n
+                    if (!InputValidator::validateUuid($inputData['stateId'])) {\n
+                        throw new \Exception('Invalid State ID (must be a valid UUID)');\n
+                    }\n
+                    $task->setStateId($inputData['stateId']);\n
+                }\n
+\n
+                // Gestion des dates\n
+                if (isset($inputData['beginDate'])) {\n
+                    $task->setBeginDate($inputData['beginDate'] ? new \DateTime($inputData['beginDate']) : null);\n
+                }\n
+                if (isset($inputData['theoricalEndDate'])) {\n
+                    $task->setTheoreticalEndDate($inputData['theoricalEndDate'] ? new \DateTime($inputData['theoricalEndDate']) : null);\n
+                }\n
+                if (isset($inputData['realEndDate'])) {\n
+                    $task->setRealEndDate($inputData['realEndDate'] ? new \DateTime($inputData['realEndDate']) : null);\n
+                }\n
+\n
+                // Sauvegarde\n
+                $task->setUpdatedat((new \DateTime())->format('Y-m-d H:i:s'));\n
+                $currentUser = Security::getUser();\n
+                if ($currentUser) {\n
+                    $task->setUpdatedby($currentUser->getId());\n
+                }\n
+                $taskRepo->update($task);\n
+\n
+                // Assignation du développeur\n
+                if (!empty($inputData['developerId']) && InputValidator::validateUuid($inputData['developerId'])) {\n
+                    $taskRepo->deleteUserAssignment($taskId);\n
+                    $taskRepo->insertUserAssignment($inputData['developerId'], $taskId);\n
+                }\n
+\n
+                $this->jsonSuccess([\n
+                    'message' => 'Task updated successfully',\n
+                    'task' => $task->toArray(),\n
+                ]);\n
+            } catch (\Exception $e) {\n
+                $this->json([\n
+                    'success' => false,\n
+                    'error' => $e->getMessage(),\n
+                ]);\n
+            }\n
+        } else {\n
+            $this->json([\n
+                'success' => false,\n
+                'error' => 'La méthode HTTP doit être PUT',\n
+            ]);\n
+        }\n
+    }\n
+\n
+    #[OA\Get(\n
+        path: '/api/states',\n
+        summary: 'Get all task states (JSON)',\n
+        tags: ['Tasks'],\n
+        responses: [\n
+            new OA\Response(\n
+                response: 200,\n
+                description: 'Successful response',\n
+                content: new OA\JsonContent(\n
+                    properties: [\n
+                        new OA\Property(property: 'states', type: 'array', items: new OA\Items(ref: '#/components/schemas/State')),\n
+                    ]\n
+                )\n
+            ),\n
+        ]\n
+    )]\n
+    final public function getApiStates(): void\n
+    {\n
+        try {\n
+            $stateRepo = new Repository(\Kentec\App\Model\State::class);\n
+            $states = $stateRepo->getAll();\n
+\n
+            $statesArray = [];\n
+            if ($states) {\n
+                foreach ($states as $state) {\n
+                    $statesArray[] = $state->toArray();\n
+                }\n
+            }\n
+\n
+            $this->jsonSuccess([\n
+                'states' => $statesArray,\n
+            ]);\n
+        } catch (\Exception $e) {\n
+            $this->json([\n
+                'success' => false,\n
+                'error' => $e->getMessage(),\n
+            ]);\n
+        }\n
+    }\n
+}\n
+' [UTF-8](length: 28304) contains "updatedat = NOW()" [ASCII](length: 17).
+
+/app/tests/Unit/Controller/TaskControllerTest.php:124
+
+FAILURES!
+Tests: 24, Assertions: 31, Failures: 2.

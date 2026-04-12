@@ -25,6 +25,7 @@ const ROUTES = [
         'CONTROLLER'   => 'AuthController',
         'METHOD'       => 'register',
         'HTTP_METHODS' => ['GET', 'POST'],
+        'AUTH'         => ['ADMIN', 'PDG'],
     ],
 
     // ----------------------- UTILISATEURS ---------------------------
@@ -56,7 +57,7 @@ const ROUTES = [
         'CONTROLLER'   => 'UsersController',
         'METHOD'       => 'getApiUsers',
         'HTTP_METHODS' => 'GET',
-        'AUTH'         => ['ADMIN', 'CDP', 'PDG'],
+        'AUTH'         => true,
     ],
     '/api/user/{userId}' => [
         'CONTROLLER'   => 'UsersController',
@@ -74,7 +75,7 @@ const ROUTES = [
         'CONTROLLER'   => 'UsersController',
         'METHOD'       => 'editApiUser',
         'HTTP_METHODS' => 'PATCH',
-        'AUTH'         => ['ADMIN', 'PDG', 'CDP', 'USER'],
+        'AUTH'         => ['ADMIN', 'PDG'],
     ],
     '/api/delete/user/{userId}' => [
         'CONTROLLER'   => 'UsersController',
@@ -194,7 +195,7 @@ const ROUTES = [
         'CONTROLLER'   => 'ClientController',
         'METHOD'       => 'getApiClients',
         'HTTP_METHODS' => 'GET',
-        'AUTH'         => ['ADMIN', 'CDP', 'PDG'],
+        'AUTH'         => true,
     ],
     '/api/clients/search' => [
         'CONTROLLER'   => 'ClientController',
@@ -340,6 +341,12 @@ const ROUTES = [
         'CONTROLLER'   => 'SwaggerController',
         'METHOD'       => 'index',
         'HTTP_METHODS' => 'GET',
+    ],
+    '/history' => [
+        'CONTROLLER'   => 'HistoryController',
+        'METHOD'       => 'index',
+        'HTTP_METHODS' => 'GET',
+        'AUTH'         => true,
     ],
     '/api-docs' => [
         'CONTROLLER'   => 'SwaggerController',

@@ -165,4 +165,23 @@ class ProjectRepository extends Repository
         );
         return $rows[0]['id'] ?? null;
     }
+
+    public function findAllArchived(): array
+    {
+        return $this->customQuery(
+            'SELECT * FROM project WHERE isactive = false ORDER BY id DESC'
+        ) ?? [];
+    }
+
+    public function findArchivedByUserId(string $userId): array
+    {
+        return $this->customQuery(
+            'SELECT DISTINCT p.* FROM project p
+             INNER JOIN task t ON t.project_id = p.id
+             INNER JOIN usertaskREL ur ON ur.task_id = t.id
+             WHERE ur.user_id = :userId AND p.isactive = false
+             ORDER BY p.id DESC',
+            ['userId' => $userId]
+        ) ?? [];
+    }
 }
