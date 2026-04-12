@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Kentec\App\Controller;
 
+use Kentec\App\Model\Project;
 use Kentec\App\Model\State;
 use Kentec\App\Repository\AbsenceRepository;
 use Kentec\App\Repository\ProjectRepository;
