@@ -36,10 +36,16 @@ class TaskController extends AbstractController
         $currentUser = Security::getUser();
         $role        = $currentUser ? ($currentUser->getRoleName() ?? 'USER') : 'USER';
 
-        if ($role === 'USER') {
-            $tasks = $taskRepo->findByUserId($currentUser->getId());
+        if ($role === 'USER' && $currentUser) {
+            $tasks = $taskRepo->customQuery(
+                'SELECT t.* FROM task t
+                 INNER JOIN usertaskREL ur ON ur.task_id = t.id
+                 WHERE ur.user_id = :userId AND t.isactive = true
+                 ORDER BY t.id DESC',
+                ['userId' => $currentUser->getId()]
+            );
         } else {
-            $tasks = $taskRepo->findAllOrderedById();
+            $tasks = $taskRepo->customQuery('SELECT * FROM task WHERE isactive = true ORDER BY id DESC');
         }
 
         // Récupération de tous les utilisateurs une seule fois
@@ -154,9 +160,15 @@ class TaskController extends AbstractController
 
                 // USER : seulement ses tâches assignées
                 if ($role === 'USER' && $currentUser) {
-                    $tasks = $taskRepo->findByUserId($currentUser->getId());
+                    $tasks = $taskRepo->customQuery(
+                        'SELECT t.* FROM task t
+                         INNER JOIN usertaskREL ur ON ur.task_id = t.id
+                         WHERE ur.user_id = :userId AND t.isactive = true
+                         ORDER BY t.id DESC',
+                        ['userId' => $currentUser->getId()]
+                    );
                 } else {
-                    $tasks = $taskRepo->findAllOrderedById();
+                    $tasks = $taskRepo->customQuery('SELECT * FROM task WHERE isactive = true ORDER BY id DESC');
                 }
 
                 // Récupération de tous les utilisateurs une seule fois
@@ -296,7 +308,12 @@ class TaskController extends AbstractController
     )]
     final public function deleteApiTask(string $taskId): void
     {
-        $this->verifyCsrf();
+        $token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+        if (!Security::verifyCsrfToken($token)) {
+            $this->jsonError('Requête invalide (token CSRF manquant ou expiré).', 403);
+            return;
+        }
+
         if ('DELETE' === $_SERVER['REQUEST_METHOD']) {
             try {
                 // Validate taskId
@@ -321,16 +338,12 @@ class TaskController extends AbstractController
                     return;
                 }
 
-                // Supprimer d'abord la relation usertaskREL (FK constraint)
-                $taskRepo->deleteUserAssignment($taskId);
+                $currentUser = Security::getUser();
 
-                $taskRepo->delete($taskId);
+                // Archiver la tâche (isactive = false) au lieu de la supprimer physiquement
+                $taskRepo->softDelete($taskId, $currentUser?->getId()); // updatedby updatedat = NOW()
 
-                $this->json([
-                    'success' => true,
-                    'delete' => true,
-                    'message' => 'Task deleted successfully',
-                ]);
+                $this->jsonSuccess(['message' => 'Tâche archivée avec succès']);
             } catch (\Exception $e) {
                 $this->json([
                     'success' => false,
@@ -377,16 +390,19 @@ class TaskController extends AbstractController
     )]
     final public function addApiTask(): void
     {
-        $this->verifyCsrf();
+        $token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+        if (!Security::verifyCsrfToken($token)) {
+            $this->jsonError('Requête invalide (token CSRF manquant ou expiré).', 403);
+            return;
+        }
+
         if ('POST' === $_SERVER['REQUEST_METHOD']) {
             try {
                 // Récupération des données JSON
                 $rawInput = file_get_contents('php://input');
-                error_log('[TaskController::addApiTask] Raw input: ' . $rawInput);
                 $inputData = json_decode($rawInput, true);
 
                 if (!$inputData) {
-                    error_log('[TaskController::addApiTask] No data received or invalid JSON');
                     throw new \Exception('No data received');
                 }
 
@@ -408,7 +424,7 @@ class TaskController extends AbstractController
                 $task->setFormat($inputData['format'] ?? null);
                 $task->setPriority($inputData['priority'] ?? null);
                 $task->setDifficulty($inputData['dificulty'] ?? $inputData['difficulty'] ?? null);
-                
+
 
                 // Validate effortRequired
                 if (!isset($inputData['effortRequired']) || '' === $inputData['effortRequired'] || null === $inputData['effortRequired']) {
@@ -422,9 +438,7 @@ class TaskController extends AbstractController
 
                 // Validate Project ID UUID
                 if (!empty($inputData['projectId'])) {
-                    error_log('[TaskController::addApiTask] Validating projectId: ' . $inputData['projectId']);
                     if (!InputValidator::validateUuid($inputData['projectId'])) {
-                        error_log('[TaskController::addApiTask] Invalid Project ID: ' . $inputData['projectId']);
                         throw new \Exception('Invalid Project ID (must be a valid UUID)');
                     }
                     $task->setProjectId($inputData['projectId']);
@@ -450,7 +464,19 @@ class TaskController extends AbstractController
                     $task->setRealEndDate(new \DateTime($inputData['realEndDate']));
                 }
 
+                // Attribution automatique du statut "En attente"
+                $projectRepoForState = new ProjectRepository();
+                $defaultStateId = $projectRepoForState->findDefaultStateId();
+                if ($defaultStateId !== null) {
+                    $task->setStateId($defaultStateId);
+                }
+
                 // Sauvegarde avec récupération de l'ID généré
+                $currentUser = Security::getUser();
+                if ($currentUser) {
+                    $task->setCreatedby($currentUser->getId());
+                    $task->setUpdatedby($currentUser->getId());
+                }
                 $newTaskId = $taskRepo->insertAndReturnId($task);
 
                 // Assignation du développeur
@@ -459,8 +485,7 @@ class TaskController extends AbstractController
                     $taskRepo->insertUserAssignment($inputData['developerId'], $newTaskId);
                 }
 
-                $this->json([
-                    'success' => true,
+                $this->jsonSuccess([
                     'message' => 'Task created successfully',
                     'task' => $task->toArray(),
                 ]);
@@ -513,22 +538,23 @@ class TaskController extends AbstractController
     )]
     final public function editApiTask(string $taskId): void
     {
-        $this->verifyCsrf();
+        $token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+        if (!Security::verifyCsrfToken($token)) {
+            $this->jsonError('Requête invalide (token CSRF manquant ou expiré).', 403);
+            return;
+        }
+
         if ('PUT' === $_SERVER['REQUEST_METHOD']) {
             try {
-                error_log('[TaskController::editApiTask] Task ID: ' . $taskId);
                 if (!InputValidator::validateUuid($taskId)) {
-                    error_log('[TaskController::editApiTask] Invalid Task UUID: ' . $taskId);
                     throw new \Exception('Invalid UUID format');
                 }
 
                 // Récupération des données JSON
                 $rawInput = file_get_contents('php://input');
-                error_log('[TaskController::editApiTask] Raw input: ' . $rawInput);
                 $inputData = json_decode($rawInput, true);
 
                 if (!$inputData) {
-                    error_log('[TaskController::editApiTask] No data received');
                     throw new \Exception('No data received');
                 }
 
@@ -597,7 +623,11 @@ class TaskController extends AbstractController
                 }
 
                 // Sauvegarde
-                $taskRepo->update($task);
+                $currentUser = Security::getUser();
+                if ($currentUser) {
+                    $task->setUpdatedby($currentUser->getId());
+                }
+                $taskRepo->updateTask($task, $taskId); // updatedat = NOW()
 
                 // Assignation du développeur
                 if (!empty($inputData['developerId']) && InputValidator::validateUuid($inputData['developerId'])) {
@@ -605,8 +635,7 @@ class TaskController extends AbstractController
                     $taskRepo->insertUserAssignment($inputData['developerId'], $taskId);
                 }
 
-                $this->json([
-                    'success' => true,
+                $this->jsonSuccess([
                     'message' => 'Task updated successfully',
                     'task' => $task->toArray(),
                 ]);
@@ -653,8 +682,7 @@ class TaskController extends AbstractController
                 }
             }
 
-            $this->json([
-                'success' => true,
+            $this->jsonSuccess([
                 'states' => $statesArray,
             ]);
         } catch (\Exception $e) {

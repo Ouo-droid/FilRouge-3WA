@@ -245,4 +245,86 @@ class TaskRepository extends Repository
             ['stateId' => $stateId, 'projectId' => $projectId]
         );
     }
+
+    public function updateTask(Task $task, string $taskId): void
+    {
+        $this->customQuery(
+            'UPDATE task
+             SET name = :name,
+                 description = :description,
+                 type = :type,
+                 format = :format,
+                 priority = :priority,
+                 difficulty = :difficulty,
+                 effortrequired = :effortrequired,
+                 effortmade = :effortmade,
+                 project_id = :project_id,
+                 state_id = :state_id,
+                 begindate = :begindate,
+                 theoreticalenddate = :theoreticalenddate,
+                 realenddate = :realenddate,
+                 updatedat = NOW(),
+                 updatedby = :updatedby
+             WHERE id = :id',
+            [
+                'name'               => $task->getName(),
+                'description'        => $task->getDescription(),
+                'type'               => $task->getType(),
+                'format'             => $task->getFormat(),
+                'priority'           => $task->getPriority(),
+                'difficulty'         => $task->getDifficulty(),
+                'effortrequired'     => $task->getEffortrequired(),
+                'effortmade'         => $task->getEffortmade(),
+                'project_id'         => $task->getProjectId(),
+                'state_id'           => $task->getStateId(),
+                'begindate'          => $task->getBeginDate()?->format('Y-m-d'),
+                'theoreticalenddate' => $task->getTheoreticalEndDate()?->format('Y-m-d'),
+                'realenddate'        => $task->getRealEndDate()?->format('Y-m-d'),
+                'updatedby'          => $task->getUpdatedby(),
+                'id'                 => $taskId,
+            ]
+        );
+    }
+
+    public function softDelete(string $taskId, ?string $updatedBy): void
+    {
+        $this->customQuery(
+            'UPDATE task
+             SET isactive = false,
+                 updatedat = NOW(),
+                 updatedby = :updatedby
+             WHERE id = :id',
+            ['updatedby' => $updatedBy, 'id' => $taskId]
+        );
+    }
+
+    public function archiveByProject(string $projectId, ?string $updatedBy): void
+    {
+        $this->customQuery(
+            'UPDATE task
+             SET isactive = false,
+                 updatedat = NOW(),
+                 updatedby = :updatedby
+             WHERE project_id = :projectId',
+            ['updatedby' => $updatedBy, 'projectId' => $projectId]
+        );
+    }
+
+    public function findAllArchived(): array
+    {
+        return $this->customQuery(
+            'SELECT * FROM task WHERE isactive = false ORDER BY id DESC'
+        ) ?? [];
+    }
+
+    public function findArchivedByUserId(string $userId): array
+    {
+        return $this->customQuery(
+            'SELECT t.* FROM task t
+             INNER JOIN usertaskREL ur ON ur.task_id = t.id
+             WHERE ur.user_id = :userId AND t.isactive = false
+             ORDER BY t.id DESC',
+            ['userId' => $userId]
+        ) ?? [];
+    }
 }

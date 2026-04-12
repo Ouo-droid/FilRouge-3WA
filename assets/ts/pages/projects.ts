@@ -622,7 +622,7 @@ async function loadStatesIntoSelect(formOverlay: HTMLElement, selectedStateId: s
     try {
         const response = await fetch('/api/states');
         const data = await response.json();
-        const states: StateData[] = data?.states || [];
+        const states: StateData[] = data?.data?.states || data?.states || [];
 
         const stateSelect = formOverlay.querySelector('#edit-state, #create-state') as HTMLSelectElement;
         if (stateSelect) {
