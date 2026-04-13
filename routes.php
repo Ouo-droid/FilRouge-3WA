@@ -109,6 +109,12 @@ const ROUTES = [
         'HTTP_METHODS' => 'GET',
         'AUTH'         => true,
     ],
+    '/archive/project/{id}' => [
+        'CONTROLLER'   => 'ProjectController',
+        'METHOD'       => 'showArchived',
+        'HTTP_METHODS' => 'GET',
+        'AUTH'         => true,
+    ],
     '/project/{id}' => [
         'CONTROLLER'   => 'ProjectController',
         'METHOD'       => 'show',
@@ -138,6 +144,20 @@ const ROUTES = [
         'METHOD'       => 'deleteApiProject',
         'HTTP_METHODS' => 'DELETE',
         'AUTH'         => ['ADMIN', 'PDG'],
+    ],
+
+    '/api/complete/project/{projectId}' => [
+        'CONTROLLER'   => 'ProjectController',
+        'METHOD'       => 'completeApiProject',
+        'HTTP_METHODS' => 'PUT',
+        'AUTH'         => ['ADMIN', 'CDP', 'PDG'],
+    ],
+
+    '/api/export/project/{projectId}' => [
+        'CONTROLLER'   => 'ProjectController',
+        'METHOD'       => 'exportXlsx',
+        'HTTP_METHODS' => 'GET',
+        'AUTH'         => ['ADMIN', 'CDP', 'PDG'],
     ],
 
     // ----------------------- TACHES ---------------------------

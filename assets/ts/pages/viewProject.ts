@@ -8,7 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const dataEl = document.getElementById('pd-project-data');
     if (!dataEl) return; // Not on the project details page
 
-    let pdData: { projectId: string; projectName: string; canCreate: boolean; canDelete: boolean; states: {id:string;name:string}[]; tasks: {id:string;name:string}[]; users: {id:string;name:string}[] };
+    let pdData: { projectId: string; projectName: string; canCreate: boolean; canDelete: boolean; allTasksCompleted: boolean; states: {id:string;name:string}[]; tasks: {id:string;name:string}[]; users: {id:string;name:string}[] };
     try {
         pdData = JSON.parse(dataEl.textContent ?? '{}');
     } catch {
@@ -256,6 +256,36 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+
+    // ── "Terminer le projet" button ──────────────────────────────────────────
+    document.getElementById('pd-btn-complete')?.addEventListener('click', () => {
+        openModal('pd-modal-complete-project');
+    });
+
+    document.getElementById('cp-submit')?.addEventListener('click', async () => {
+        hideError('cp-error');
+
+        const btn = document.getElementById('cp-submit') as HTMLButtonElement;
+        btn.disabled = true;
+
+        try {
+            const res = await fetch(`/api/complete/project/${encodeURIComponent(projectId)}`, {
+                method: 'PUT',
+                headers: { 'X-CSRF-Token': getCsrfToken() },
+            });
+
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !(data as any).success) {
+                showError('cp-error', (data as any).error ?? 'Erreur lors de la finalisation.');
+                btn.disabled = false;
+            } else {
+                window.location.href = '/projects';
+            }
+        } catch {
+            showError('cp-error', 'Erreur réseau. Veuillez réessayer.');
+            btn.disabled = false;
+        }
+    });
 
     // ── Delete project modal ─────────────────────────────────────────────────
     document.getElementById('dp-submit')?.addEventListener('click', async () => {

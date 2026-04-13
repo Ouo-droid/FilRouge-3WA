@@ -682,7 +682,8 @@ class TaskController extends AbstractController
                 }
             }
 
-            $this->jsonSuccess([
+            $this->json([
+                'success' => true,
                 'states' => $statesArray,
             ]);
         } catch (\Exception $e) {

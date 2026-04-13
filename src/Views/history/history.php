@@ -26,7 +26,7 @@ $userRole         = $userRole ?? 'USER';
         <?php } else { ?>
             <div class="projects-list">
                 <?php foreach ($archivedProjects as $project) { ?>
-                    <div class="project-card">
+                    <a href="/archive/project/<?php echo htmlspecialchars($project['id']); ?>" class="project-card project-card--link" style="text-decoration:none;color:inherit;display:flex;">
                         <div class="project-card__icon">
                             <i class="fas fa-folder text-secondary"></i>
                         </div>
@@ -49,7 +49,10 @@ $userRole         = $userRole ?? 'USER';
                                 Archivé le : <?php echo (new DateTime($project['updatedat']))->format('d/m/Y H:i'); ?>
                             </span>
                         </div>
-                    </div>
+                        <div class="project-card__action" style="display:flex;align-items:center;padding-left:1rem;">
+                            <i class="fas fa-chevron-right text-muted"></i>
+                        </div>
+                    </a>
                 <?php } ?>
             </div>
         <?php } ?>
@@ -114,6 +117,14 @@ document.querySelectorAll('.filter-btn').forEach(btn => {
 }
 .tab-content {
     animation: fadeIn 0.3s ease-in-out;
+}
+.project-card--link {
+    cursor: pointer;
+    transition: box-shadow 0.15s, transform 0.15s;
+}
+.project-card--link:hover {
+    box-shadow: 0 4px 16px rgba(0,0,0,.1);
+    transform: translateY(-1px);
 }
 @keyframes fadeIn {
     from { opacity: 0; }
