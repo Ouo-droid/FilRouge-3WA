@@ -21,6 +21,14 @@ class ProjectRepository extends Repository
         ) ?? [];
     }
 
+    public function findActiveByClientId(string $siret): array
+    {
+        return $this->customQuery(
+            'SELECT * FROM project WHERE client_id = :siret AND isactive = true',
+            ['siret' => $siret]
+        ) ?? [];
+    }
+
     public function findActiveByUserId(string $userId): array
     {
         return $this->customQuery(

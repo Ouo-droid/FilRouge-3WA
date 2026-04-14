@@ -6,6 +6,7 @@ namespace Kentec\App\Controller;
 
 use Kentec\App\Model\Task;
 use Kentec\App\Repository\AbsenceRepository;
+use Kentec\App\Repository\ProjectRepository;
 use Kentec\App\Repository\TaskRepository;
 use Kentec\Kernel\Database\Repository;
 use Kentec\Kernel\Http\AbstractController;

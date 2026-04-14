@@ -167,10 +167,8 @@ class ClientController extends AbstractController
                 }
 
                 // On recupere aussi les projets actifs du client pour le test
-                $projects = $this->customQuery(
-                    'SELECT * FROM project WHERE client_id = :siret AND isactive = true',
-                    ['siret' => $siret]
-                );
+                $projectRepo = new ProjectRepository();
+                $projects = $projectRepo->findActiveByClientId($siret);
                 $clientData['projects'] = $projects;
 
                 $this->jsonSuccess($clientData);
@@ -215,10 +213,8 @@ class ClientController extends AbstractController
 
                 // On ne fait jamais de archive : soft delete (isactive = false)
                 // updatedby et updatedat renseignés pour l'historique
-                $this->customQuery(
-                    'UPDATE client SET isactive = false, updatedat = NOW(), updatedby = :updatedby WHERE siret = :siret',
-                    ['updatedby' => $currentUser?->getId(), 'siret' => $siret]
-                );
+                $clientSpecificRepo = new ClientRepository();
+                $clientSpecificRepo->softDelete($siret, $currentUser?->getId());
 
                 $this->jsonSuccess(['message' => 'Client archivé avec succès']);
             } catch (\Exception $e) {
@@ -233,7 +229,6 @@ class ClientController extends AbstractController
     #[OA\Post(
         path: '/api/add/client',
         summary: 'Add new client (JSON)',
-        tags: ['Clients'],
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\JsonContent(
@@ -246,7 +241,7 @@ class ClientController extends AbstractController
                     new OA\Property(property: 'contactLastname', type: 'string'),
                     new OA\Property(property: 'contactEmail', type: 'string', format: 'email'),
                     new OA\Property(property: 'contactPhone', type: 'string'),
-                    new OA\Property(property: 'address', type: 'object', properties: [
+                    new OA\Property(property: 'address', properties: [
                         new OA\Property(property: 'streetNumber', type: 'integer'),
                         new OA\Property(property: 'streetLetter', type: 'string'),
                         new OA\Property(property: 'streetName', type: 'string'),
@@ -254,10 +249,11 @@ class ClientController extends AbstractController
                         new OA\Property(property: 'state', type: 'string'),
                         new OA\Property(property: 'city', type: 'string'),
                         new OA\Property(property: 'country', type: 'string'),
-                    ]),
+                    ], type: 'object'),
                 ]
             )
         ),
+        tags: ['Clients'],
         responses: [
             new OA\Response(response: 200, description: 'Client created'),
             new OA\Response(response: 400, description: 'Invalid input'),
@@ -363,10 +359,6 @@ class ClientController extends AbstractController
     #[OA\Put(
         path: '/api/edit/client/{numSIRET}',
         summary: 'Edit client (JSON)',
-        tags: ['Clients'],
-        parameters: [
-            new OA\Parameter(name: 'numSIRET', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
-        ],
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\JsonContent(
@@ -377,7 +369,7 @@ class ClientController extends AbstractController
                     new OA\Property(property: 'contactLastname', type: 'string'),
                     new OA\Property(property: 'contactEmail', type: 'string', format: 'email'),
                     new OA\Property(property: 'contactPhone', type: 'string'),
-                    new OA\Property(property: 'address', type: 'object', properties: [
+                    new OA\Property(property: 'address', properties: [
                         new OA\Property(property: 'streetNumber', type: 'integer'),
                         new OA\Property(property: 'streetLetter', type: 'string'),
                         new OA\Property(property: 'streetName', type: 'string'),
@@ -385,10 +377,14 @@ class ClientController extends AbstractController
                         new OA\Property(property: 'state', type: 'string'),
                         new OA\Property(property: 'city', type: 'string'),
                         new OA\Property(property: 'country', type: 'string'),
-                    ]),
+                    ], type: 'object'),
                 ]
             )
         ),
+        tags: ['Clients'],
+        parameters: [
+            new OA\Parameter(name: 'numSIRET', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+        ],
         responses: [
             new OA\Response(response: 200, description: 'Client updated'),
             new OA\Response(response: 404, description: 'Client not found'),

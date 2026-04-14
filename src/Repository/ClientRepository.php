@@ -106,6 +106,14 @@ class ClientRepository extends Repository
         );
     }
 
+    public function softDelete(string $siret, ?string $updatedBy): void
+    {
+        $this->customQuery(
+            'UPDATE client SET isactive = false, updatedat = NOW(), updatedby = :updatedby WHERE siret = :siret',
+            ['updatedby' => $updatedBy, 'siret' => $siret]
+        );
+    }
+
     public function countAll(): int
     {
         $rows = $this->customQuery('SELECT siret FROM client') ?? [];
