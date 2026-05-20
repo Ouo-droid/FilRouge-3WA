@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Kentec\App\Controller;
 
+use Kentec\App\Model\Project;
 use Kentec\App\Model\State;
 use Kentec\App\Repository\AbsenceRepository;
 use Kentec\App\Repository\ProjectRepository;
@@ -38,9 +39,16 @@ class ProjectController extends AbstractController
 
         // USER : seulement les projets sur lesquels il a au moins une tâche assignée
         if ($userRole === 'USER' && $currentUser) {
-            $projects = $projectRepo->findActiveByUserId($currentUser->getId());
+            $projects = $projectRepo->customQuery(
+                'SELECT DISTINCT p.* FROM project p
+                 INNER JOIN task t ON t.project_id = p.id
+                 INNER JOIN usertaskREL ur ON ur.task_id = t.id
+                 WHERE ur.user_id = :userId AND p.isactive = true
+                 ORDER BY p.id DESC',
+                ['userId' => $currentUser->getId()]
+            );
         } else {
-            $projects = $projectRepo->findAllActive();
+            $projects = $projectRepo->customQuery('SELECT * FROM project WHERE isactive = true ORDER BY id DESC');
         }
 
         // Récupération de tous les utilisateurs une seule fois
@@ -237,7 +245,11 @@ class ProjectController extends AbstractController
         $stateRepo   = new Repository(State::class);
 
         // Récupérer le projet actif
-        $project = $projectRepo->findActiveById($id);
+        $results = $projectRepo->customQuery(
+            'SELECT * FROM project WHERE id = :id AND isactive = true',
+            ['id' => $id]
+        );
+        $project = !empty($results) ? $results[0] : null;
 
         if ($project === null) {
             header('Location: /projects');
@@ -373,6 +385,7 @@ class ProjectController extends AbstractController
         $effortRequired = 0.0;
         $effortMade     = 0.0;
         foreach ($tasks as $task) {
+            // effortrequired + effortmade pour le test
             $effortRequired += (float) ($task->getEffortrequired() ?? 0);
             $effortMade     += (float) ($task->getEffortmade()     ?? 0);
         }
@@ -390,6 +403,163 @@ class ProjectController extends AbstractController
             'canCreate'      => $canCreate,
             'canDelete'      => $canDelete,
             'allUsers'       => array_values($usersById),
+        ]);
+    }
+
+    // Affichage d'un projet archivé en lecture seule
+    final public function showArchived(string $id): void
+    {
+        if (!InputValidator::validateUuid($id)) {
+            header('Location: /history');
+            exit;
+        }
+
+        $currentUser = Security::getUser();
+        $userRole    = $currentUser ? ($currentUser->getRoleName() ?? 'USER') : 'USER';
+
+        $projectRepo = new ProjectRepository();
+        $userRepo    = new Repository(\Kentec\App\Model\User::class);
+        $taskRepo    = new TaskRepository();
+        $stateRepo   = new Repository(State::class);
+
+        $project = $projectRepo->findArchivedById($id);
+
+        if ($project === null) {
+            header('Location: /history');
+            exit;
+        }
+
+        // Contrôle d'accès : USER ne peut voir que les projets sur lesquels il a une tâche
+        if ($userRole === 'USER' && $currentUser) {
+            $hasAccess = $projectRepo->customQuery(
+                'SELECT 1 FROM project p
+                 INNER JOIN task t ON t.project_id = p.id
+                 INNER JOIN usertaskREL ur ON ur.task_id = t.id
+                 WHERE p.id = :id AND ur.user_id = :userId LIMIT 1',
+                ['id' => $id, 'userId' => $currentUser->getId()]
+            );
+            if (empty($hasAccess)) {
+                header('Location: /history');
+                exit;
+            }
+        }
+
+        // Normalisation des clés
+        $project['beginDate']         = $project['beginDate']         ?? $project['begindate']         ?? null;
+        $project['theoricalDeadLine'] = $project['theoricalDeadLine'] ?? $project['theoricaldeadline'] ?? null;
+        $project['realDeadLine']      = $project['realDeadLine']      ?? $project['realdeadline']      ?? null;
+
+        $users = $userRepo->getAll();
+        $usersById = [];
+        foreach ($users as $user) {
+            $usersById[$user->getId()] = $user;
+        }
+
+        if (!empty($project['project_manager_id']) && isset($usersById[$project['project_manager_id']])) {
+            $project['manager_object'] = $usersById[$project['project_manager_id']];
+        }
+
+        $states = $stateRepo->getAll();
+        $statesById = [];
+        $completedStateId = null;
+        if ($states) {
+            foreach ($states as $state) {
+                $statesById[$state->getId()] = $state;
+                if (false !== stripos($state->getName(), 'termin')
+                    || false !== stripos($state->getName(), 'done')
+                    || false !== stripos($state->getName(), 'clos')
+                    || false !== stripos($state->getName(), 'fini')) {
+                    $completedStateId = $state->getId();
+                }
+            }
+        }
+
+        // Toutes les tâches du projet quelle que soit leur isactive
+        $tasks = $taskRepo->getByAttributes(['project_id' => $id], true, null);
+        if (!is_array($tasks)) {
+            $tasks = $tasks ? [$tasks] : [];
+        }
+
+        $assignments    = $taskRepo->findAllUserAssignments();
+        $taskDevelopers = [];
+        foreach ($assignments as $assignment) {
+            $taskDevelopers[$assignment['task_id']] = $assignment['user_id'];
+        }
+
+        $stats = [
+            'total'       => count($tasks),
+            'completed'   => 0,
+            'in_progress' => 0,
+            'todo'        => 0,
+            'progress'    => 0,
+        ];
+
+        $team = [];
+        if (!empty($project['project_manager_id']) && isset($usersById[$project['project_manager_id']])) {
+            $userId = $project['project_manager_id'];
+            $team[$userId] = [
+                'user'         => $usersById[$userId],
+                'role'         => 'Chef de projet',
+                'active_tasks' => 0,
+                'is_absent'    => false,
+                'absence'      => null,
+            ];
+        }
+
+        foreach ($tasks as $task) {
+            $stateId   = $task->getStateId();
+            $stateName = isset($statesById[$stateId]) ? $statesById[$stateId]->getName() : '';
+
+            if ($stateId == $completedStateId) {
+                ++$stats['completed'];
+            } elseif (false !== stripos($stateName, 'todo')
+                      || false !== stripos($stateName, 'faire')
+                      || false !== stripos($stateName, 'attente')
+                      || false !== stripos($stateName, 'backlog')) {
+                ++$stats['todo'];
+            } else {
+                ++$stats['in_progress'];
+            }
+
+            $devId = $taskDevelopers[$task->getId()] ?? null;
+            if ($devId && isset($usersById[$devId])) {
+                if (!isset($team[$devId])) {
+                    $team[$devId] = [
+                        'user'         => $usersById[$devId],
+                        'role'         => 'Développeur',
+                        'active_tasks' => 0,
+                        'is_absent'    => false,
+                        'absence'      => null,
+                    ];
+                }
+            }
+        }
+
+        $stats['progress'] = $stats['total'] > 0 ? round(($stats['completed'] / $stats['total']) * 100) : 0;
+
+        $effortRequired = 0.0;
+        $effortMade     = 0.0;
+        foreach ($tasks as $task) {
+            $effortRequired += (float) ($task->getEffortrequired() ?? 0);
+            $effortMade     += (float) ($task->getEffortmade()     ?? 0);
+        }
+        $stats['effort_required'] = round($effortRequired, 2);
+        $stats['effort_made']     = round($effortMade, 2);
+
+        $this->render('project/details.php', [
+            'project'        => $project,
+            'tasks'          => $tasks,
+            'stats'          => $stats,
+            'team'           => $team,
+            'states'         => $statesById,
+            'taskDevelopers' => $taskDevelopers,
+            'userRole'       => $userRole,
+            'canCreate'      => false,
+            'canDelete'      => false,
+            'allUsers'       => array_values($usersById),
+            'isReadOnly'     => true,
+            'backLink'       => '/history',
+            'backLabel'      => 'Retour à l\'historique',
         ]);
     }
 
@@ -426,9 +596,16 @@ class ProjectController extends AbstractController
 
             // USER : seulement les projets où il a au moins une tâche assignée
             if ($userRole === 'USER' && $currentUser) {
-                $projects = $projectRepo->findActiveByUserId($currentUser->getId());
+                $projects = $projectRepo->customQuery(
+                    'SELECT DISTINCT p.* FROM project p
+                     INNER JOIN task t ON t.project_id = p.id
+                     INNER JOIN usertaskREL ur ON ur.task_id = t.id
+                     WHERE ur.user_id = :userId AND p.isactive = true
+                     ORDER BY p.id DESC',
+                    ['userId' => $currentUser->getId()]
+                );
             } else {
-                $projects = $projectRepo->findAllActive();
+                $projects = $projectRepo->customQuery('SELECT * FROM project WHERE isactive = true ORDER BY id DESC');
             }
 
             $users = $userRepo->getAll();
@@ -504,7 +681,20 @@ class ProjectController extends AbstractController
                 }
             }
 
-            $row = $projectRepo->findWithDetailsById($projectId);
+            $rows = $projectRepo->customQuery(
+                'SELECT p.*,
+                        s.name AS state_name,
+                        c.companyname AS client_name,
+                        u.firstname AS manager_firstname,
+                        u.lastname AS manager_lastname
+                 FROM project p
+                 LEFT JOIN state s ON s.id = p.state_id
+                 LEFT JOIN client c ON c.siret = p.client_id
+                 LEFT JOIN users u ON u.id = p.project_manager_id
+                 WHERE p.id = :id AND p.isactive = true',
+                ['id' => $projectId]
+            );
+            $row = !empty($rows) ? $rows[0] : null;
 
             if ($row === null) {
                 $this->jsonError('Projet introuvable', 404);
@@ -539,7 +729,7 @@ class ProjectController extends AbstractController
     final public function dynamicalProjects(): void
     {
         $projectRepo = new ProjectRepository();
-        $projects    = $projectRepo->findAllActive();
+        $projects    = $projectRepo->customQuery('SELECT * FROM project WHERE isactive = true ORDER BY id DESC');
         $this->render('project/dynamicalProjects.php', ['projects' => $projects]);
     }
 
@@ -585,9 +775,66 @@ class ProjectController extends AbstractController
             }
 
             // Soft delete : isactive = false (jamais de DELETE physique)
+            // updatedby est renseigné via softDelete
             $projectRepo->softDelete($projectId, $currentUser?->getId());
 
-            $this->jsonSuccess(['message' => 'Projet archivé avec succès']);
+            // Archiver également toutes les tâches associées au projet
+            $taskRepo = new TaskRepository();
+            $taskRepo->archiveByProject($projectId, $currentUser?->getId());
+
+            $this->jsonSuccess(['message' => 'Projet et ses tâches archivés avec succès']);
+        } catch (\Exception $e) {
+            $this->jsonError($e->getMessage(), 500);
+        }
+    }
+
+    #[OA\Put(
+        path: '/api/complete/project/{projectId}',
+        summary: 'Mark project as completed (isactive = false)',
+        tags: ['Projects'],
+        parameters: [
+            new OA\Parameter(name: 'projectId', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid')),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Project marked as completed'),
+            new OA\Response(response: 404, description: 'Project not found'),
+        ]
+    )]
+    final public function completeApiProject(string $projectId): void
+    {
+        $token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+        if (!Security::verifyCsrfToken($token)) {
+            $this->jsonError('Requête invalide (token CSRF manquant ou expiré).', 403);
+            return;
+        }
+
+        if ('PUT' !== $_SERVER['REQUEST_METHOD']) {
+            $this->jsonError('La méthode HTTP doit être PUT', 405);
+            return;
+        }
+
+        try {
+            if (!InputValidator::validateUuid($projectId)) {
+                $this->jsonError('Invalid Project ID (must be a valid UUID)', 400);
+                return;
+            }
+
+            $currentUser = Security::getUser();
+
+            $projectRepo = new ProjectRepository();
+            $project     = $projectRepo->getById($projectId);
+
+            if (!$project) {
+                $this->jsonError('Project not found', 404);
+                return;
+            }
+
+            $projectRepo->softDelete($projectId, $currentUser?->getId());
+
+            $taskRepo = new TaskRepository();
+            $taskRepo->archiveByProject($projectId, $currentUser?->getId());
+
+            $this->jsonSuccess(['message' => 'Projet terminé et archivé avec succès']);
         } catch (\Exception $e) {
             $this->jsonError($e->getMessage(), 500);
         }
@@ -820,5 +1067,114 @@ class ProjectController extends AbstractController
         } catch (\Exception $e) {
             $this->jsonError($e->getMessage(), 500);
         }
+    }
+
+    final public function exportXlsx(string $projectId): void
+    {
+        if (!InputValidator::validateUuid($projectId)) {
+            $this->jsonError('Invalid project ID', 400);
+            return;
+        }
+
+        $projectRepo = new ProjectRepository();
+        $taskRepo    = new TaskRepository();
+
+        $results = $projectRepo->customQuery(
+            'SELECT * FROM project WHERE id = :id',
+            ['id' => $projectId]
+        );
+
+        if (empty($results)) {
+            $this->jsonError('Project not found', 404);
+            return;
+        }
+
+        $project = $results[0];
+        $projectName = $project['name'] ?? 'Projet';
+
+        $tasks = $taskRepo->customQuery(
+            'SELECT t.*, s.name AS state_name,
+                    u.firstname AS dev_firstname, u.lastname AS dev_lastname
+             FROM task t
+             LEFT JOIN state s ON s.id = t.state_id
+             LEFT JOIN usertaskREL ur ON ur.task_id = t.id
+             LEFT JOIN users u ON u.id = ur.user_id
+             WHERE t.project_id = :projectId
+             ORDER BY t.id ASC',
+            ['projectId' => $projectId]
+        ) ?? [];
+
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet       = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Tâches');
+
+        // Titre du projet en A1
+        $sheet->setCellValue('A1', $projectName);
+        $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(16);
+        $sheet->mergeCells('A1:N1');
+
+        // En-têtes des colonnes à partir de la ligne 3
+        $headers = [
+            'A' => 'Nom',
+            'B' => 'Description',
+            'C' => 'Domaine',
+            'D' => 'Type',
+            'E' => 'Format',
+            'F' => 'Priorité',
+            'G' => 'Difficulté',
+            'H' => 'Effort requis',
+            'I' => 'Effort réalisé',
+            'J' => 'Date début',
+            'K' => 'Échéance théorique',
+            'L' => 'Échéance réelle',
+            'M' => 'État',
+            'N' => 'Développeur',
+        ];
+
+        foreach ($headers as $col => $label) {
+            $sheet->setCellValue($col . '3', $label);
+            $sheet->getStyle($col . '3')->getFont()->setBold(true);
+            $sheet->getStyle($col . '3')->getFill()
+                ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+                ->getStartColor()->setARGB('FFD9E1F2');
+        }
+
+        // Remplissage des données à partir de la ligne 4
+        $row = 4;
+        foreach ($tasks as $task) {
+            $devName = trim(($task['dev_firstname'] ?? '') . ' ' . ($task['dev_lastname'] ?? ''));
+
+            $sheet->setCellValue('A' . $row, $task['name'] ?? '');
+            $sheet->setCellValue('B' . $row, $task['description'] ?? '');
+            $sheet->setCellValue('C' . $row, $task['fieldofwork'] ?? '');
+            $sheet->setCellValue('D' . $row, $task['type'] ?? '');
+            $sheet->setCellValue('E' . $row, $task['format'] ?? '');
+            $sheet->setCellValue('F' . $row, $task['priority'] ?? '');
+            $sheet->setCellValue('G' . $row, $task['difficulty'] ?? '');
+            $sheet->setCellValue('H' . $row, $task['effortrequired'] ?? '');
+            $sheet->setCellValue('I' . $row, $task['effortmade'] ?? '');
+            $sheet->setCellValue('J' . $row, $task['begindate'] ?? '');
+            $sheet->setCellValue('K' . $row, $task['theoreticalenddate'] ?? '');
+            $sheet->setCellValue('L' . $row, $task['realenddate'] ?? '');
+            $sheet->setCellValue('M' . $row, $task['state_name'] ?? '');
+            $sheet->setCellValue('N' . $row, $devName ?: '');
+
+            ++$row;
+        }
+
+        // Ajustement automatique de la largeur des colonnes
+        foreach (array_keys($headers) as $col) {
+            $sheet->getColumnDimension($col)->setAutoSize(true);
+        }
+
+        $filename = 'projet_' . preg_replace('/[^a-zA-Z0-9_-]/', '_', $projectName) . '.xlsx';
+
+        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Cache-Control: max-age=0');
+
+        $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+        $writer->save('php://output');
+        exit;
     }
 }

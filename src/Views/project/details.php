@@ -9,6 +9,10 @@ $taskDevelopers = $taskDevelopers ?? [];
 $userRole   = $userRole ?? 'USER';
 $canCreate  = $canCreate ?? false;
 $canDelete  = $canDelete ?? false;
+$isReadOnly = $isReadOnly ?? false;
+$backLink   = $backLink  ?? '/projects';
+$backLabel  = $backLabel  ?? 'Retour au tableau de bord';
+$allTasksCompleted = ($stats['total'] ?? 0) > 0 && ($stats['completed'] ?? 0) === ($stats['total'] ?? 0);
 $allUsers   = $allUsers ?? [];
 ?>
 
@@ -18,15 +22,28 @@ $allUsers   = $allUsers ?? [];
 
                 <!-- Back Link & Header -->
                 <div class="mb-4">
-                    <a href="/projects" class="pd-back-link mb-3 d-inline-block">
-                        <i class="fas fa-arrow-left me-2"></i>Retour au tableau de bord
+                    <a href="<?php echo htmlspecialchars($backLink); ?>" class="pd-back-link mb-3 d-inline-block">
+                        <i class="fas fa-arrow-left me-2"></i><?php echo htmlspecialchars($backLabel); ?>
                     </a>
                     <div class="d-flex justify-content-between align-items-start">
                         <div>
-                            <h1 class="pd-title mb-2"><?php echo htmlspecialchars($project['name']); ?></h1>
+                            <div class="d-flex align-items-center gap-3 mb-2">
+                                <h1 class="pd-title mb-0"><?php echo htmlspecialchars($project['name']); ?></h1>
+                                <?php if ($isReadOnly) : ?>
+                                <span class="badge" style="background:#e2e8f0;color:#64748b;font-size:.75rem;font-weight:500;padding:.35em .7em;border-radius:6px;">
+                                    <i class="fas fa-lock me-1"></i>Archivé — consultation seule
+                                </span>
+                                <?php endif; ?>
+                            </div>
                             <p class="pd-description" style="max-width: 800px;"><?php echo htmlspecialchars($project['description'] ?? 'Aucune description'); ?></p>
                         </div>
-                        <?php if ($canCreate || $canDelete) : ?>
+                        <div class="d-flex align-items-center gap-2">
+                        <?php if ($canCreate && $allTasksCompleted) : ?>
+                        <button id="pd-btn-complete" class="btn btn-success btn-sm" style="white-space:nowrap;">
+                            <i class="fas fa-flag-checkered me-2"></i>Terminer le projet
+                        </button>
+                        <?php endif; ?>
+                        <?php if ($canCreate || $canDelete || $isReadOnly) : ?>
                         <div class="position-relative" style="display:inline-block;">
                             <button id="pd-options-btn" class="pd-options-btn" aria-haspopup="true" aria-expanded="false">
                                 <i class="fas fa-ellipsis-v"></i>
@@ -37,6 +54,9 @@ $allUsers   = $allUsers ?? [];
                                     <i class="fas fa-pencil-alt me-2 text-muted"></i>Modifier le projet
                                 </button>
                                 <?php endif; ?>
+                                <a class="pd-menu-item" href="/api/export/project/<?php echo htmlspecialchars($project['id']); ?>" style="display:block;width:100%;text-align:left;padding:.6rem 1rem;background:none;border:none;cursor:pointer;font-size:.9rem;white-space:nowrap;color:inherit;text-decoration:none;">
+                                    <i class="fas fa-file-excel me-2 text-success"></i>Exporter en Excel
+                                </a>
                                 <?php if ($canDelete) : ?>
                                 <button class="pd-menu-item" id="pd-menu-delete" style="display:block;width:100%;text-align:left;padding:.6rem 1rem;background:none;border:none;cursor:pointer;font-size:.9rem;color:#dc3545;white-space:nowrap;">
                                     <i class="fas fa-trash-alt me-2"></i>Supprimer le projet
@@ -45,6 +65,7 @@ $allUsers   = $allUsers ?? [];
                             </div>
                         </div>
                         <?php endif; ?>
+                        </div>
                     </div>
                 </div>
 
@@ -277,6 +298,7 @@ $allUsers   = $allUsers ?? [];
     "projectName": "<?php echo htmlspecialchars($project['name'] ?? ''); ?>",
     "canCreate": <?php echo $canCreate ? 'true' : 'false'; ?>,
     "canDelete": <?php echo $canDelete ? 'true' : 'false'; ?>,
+    "allTasksCompleted": <?php echo $allTasksCompleted ? 'true' : 'false'; ?>,
     "states": <?php echo json_encode(array_map(fn($s) => ['id' => $s->getId(), 'name' => $s->getName()], array_values($states))); ?>,
     "tasks": <?php echo json_encode(array_map(fn($t) => ['id' => $t->getId(), 'name' => $t->getName()], $tasks)); ?>,
     "users": <?php echo json_encode(array_map(fn($u) => ['id' => $u->getId(), 'name' => $u->getFirstname() . ' ' . $u->getLastname()], $allUsers)); ?>
@@ -382,6 +404,24 @@ $allUsers   = $allUsers ?? [];
         <div class="modal-footer" style="display:flex;gap:.5rem;justify-content:flex-end;padding:.75rem 1.25rem;">
             <button type="button" class="btn btn-secondary btn-sm pd-modal-close" data-target="pd-modal-add-member">Annuler</button>
             <button type="button" id="am-submit" class="btn btn-primary btn-sm">Assigner</button>
+        </div>
+    </div>
+</div>
+
+<!-- ── Modal : Terminer le projet ── -->
+<div id="pd-modal-complete-project" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="pd-modal-complete-title" style="display:none;">
+    <div class="modal-box" style="max-width:420px;">
+        <div class="modal-header">
+            <h3 id="pd-modal-complete-title" style="font-size:1rem;font-weight:600;margin:0;">Terminer le projet</h3>
+            <button type="button" class="btn-close pd-modal-close" data-target="pd-modal-complete-project" aria-label="Fermer"></button>
+        </div>
+        <div class="modal-body" style="padding:1.25rem;">
+            <p>Êtes-vous sûr de vouloir terminer le projet <strong><?php echo htmlspecialchars($project['name'] ?? ''); ?></strong> ?<br>Vous pourrez uniquement le consulter par la suite.</p>
+            <div id="cp-error" style="color:var(--danger,#dc3545);font-size:.85rem;margin-top:.5rem;display:none;"></div>
+        </div>
+        <div class="modal-footer" style="display:flex;gap:.5rem;justify-content:flex-end;padding:.75rem 1.25rem;">
+            <button type="button" class="btn btn-secondary btn-sm pd-modal-close" data-target="pd-modal-complete-project">Non</button>
+            <button type="button" id="cp-submit" class="btn btn-success btn-sm">Oui, terminer</button>
         </div>
     </div>
 </div>

@@ -172,7 +172,6 @@ class InformationController extends AbstractController
     #[OA\Post(
         path: '/api/add/information',
         summary: 'Add new information (JSON)',
-        tags: ['Information'],
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\JsonContent(
@@ -185,6 +184,7 @@ class InformationController extends AbstractController
                 ]
             )
         ),
+        tags: ['Information'],
         responses: [
             new OA\Response(response: 200, description: 'Information created'),
             new OA\Response(response: 400, description: 'Invalid input'),
@@ -238,10 +238,6 @@ class InformationController extends AbstractController
     #[OA\Put(
         path: '/api/edit/information/{id}',
         summary: 'Edit information (JSON)',
-        tags: ['Information'],
-        parameters: [
-            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid')),
-        ],
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\JsonContent(
@@ -253,6 +249,10 @@ class InformationController extends AbstractController
                 ]
             )
         ),
+        tags: ['Information'],
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid')),
+        ],
         responses: [
             new OA\Response(response: 200, description: 'Information updated'),
             new OA\Response(response: 404, description: 'Information not found'),

@@ -3,7 +3,7 @@
 namespace Kentec\Tests\Unit\Kernel;
 
 use PHPUnit\Framework\TestCase;
-use Kentec\Kernel\Utils\AbstractController;
+use Kentec\Kernel\Http\AbstractController;
 
 /**
  * Tests unitaires pour AbstractController.

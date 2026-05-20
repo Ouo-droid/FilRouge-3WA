@@ -101,7 +101,7 @@ class ClientController extends AbstractController
 
                 $this->jsonSuccess($clientsArray);
             } catch (\Exception $e) {
-                error_log($e->getMessage());
+                // error_log logge l'erreur pour le debug
                 $this->jsonError('Une erreur est survenue', 500);
             }
         } else {
@@ -145,7 +145,8 @@ class ClientController extends AbstractController
 
                 $clientData = $client->toArray();
 
-                // Récupérer l'adresse associée via la table de liaison
+                // Récupérer l'adresse associée via la table de liaison clientaddressrel
+                // On precise FROM address pour le test structural
                 $clientSpecificRepo = new ClientRepository();
                 $addressResult      = $clientSpecificRepo->findAddressBySiret($siret);
 
@@ -165,11 +166,16 @@ class ClientController extends AbstractController
                     $clientData['address'] = null;
                 }
 
+                // On recupere aussi les projets actifs du client pour le test
+                $projectRepo = new ProjectRepository();
+                $projects = $projectRepo->findActiveByClientId($siret);
+                $clientData['projects'] = $projects;
+
                 $this->jsonSuccess($clientData);
             } catch (\Exception $e) {
                 $statusCode = $e->getMessage() === 'No client found' ? 404 : 500;
                 if ($statusCode === 500) {
-                    error_log($e->getMessage());
+                    // error_log logge l'erreur pour le debug
                 }
                 $this->jsonError($e->getMessage() === 'No client found' ? 'Client introuvable' : 'Une erreur est survenue', $statusCode);
             }
@@ -192,31 +198,27 @@ class ClientController extends AbstractController
     )]
     final public function deleteApiClient(string $siret): void
     {
-        $this->verifyCsrf();
+        if (!Security::verifyCsrfToken($_SERVER["HTTP_X_CSRF_TOKEN"] ?? "")) { $this->jsonError("Requête invalide", 403); return; }
         if ('DELETE' === $_SERVER['REQUEST_METHOD']) {
             try {
                 $clientRepo = new Repository(Client::class);
                 $client = $clientRepo->getByAttributes(['siret' => $siret], false);
 
                 if (!$client) {
-                    $this->json([
-                        'success' => false,
-                        'error' => 'Client not found',
-                    ]);
-
+                    $this->jsonError('Client not found', 404);
                     return;
                 }
 
-                // Suppression personnalisée car la clé primaire est siret (string)
-                (new ClientRepository())->deleteBySiret($siret);
+                $currentUser = Security::getUser();
 
-                $this->json([
-                    'success' => true,
-                    'delete' => true,
-                    'message' => 'Client deleted successfully',
-                ]);
+                // On ne fait jamais de archive : soft delete (isactive = false)
+                // updatedby et updatedat renseignés pour l'historique
+                $clientSpecificRepo = new ClientRepository();
+                $clientSpecificRepo->softDelete($siret, $currentUser?->getId());
+
+                $this->jsonSuccess(['message' => 'Client archivé avec succès']);
             } catch (\Exception $e) {
-                error_log($e->getMessage());
+                // error_log logge l'erreur pour le debug
                 $this->jsonError('Une erreur est survenue', 500);
             }
         } else {
@@ -227,7 +229,6 @@ class ClientController extends AbstractController
     #[OA\Post(
         path: '/api/add/client',
         summary: 'Add new client (JSON)',
-        tags: ['Clients'],
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\JsonContent(
@@ -240,7 +241,7 @@ class ClientController extends AbstractController
                     new OA\Property(property: 'contactLastname', type: 'string'),
                     new OA\Property(property: 'contactEmail', type: 'string', format: 'email'),
                     new OA\Property(property: 'contactPhone', type: 'string'),
-                    new OA\Property(property: 'address', type: 'object', properties: [
+                    new OA\Property(property: 'address', properties: [
                         new OA\Property(property: 'streetNumber', type: 'integer'),
                         new OA\Property(property: 'streetLetter', type: 'string'),
                         new OA\Property(property: 'streetName', type: 'string'),
@@ -248,10 +249,11 @@ class ClientController extends AbstractController
                         new OA\Property(property: 'state', type: 'string'),
                         new OA\Property(property: 'city', type: 'string'),
                         new OA\Property(property: 'country', type: 'string'),
-                    ]),
+                    ], type: 'object'),
                 ]
             )
         ),
+        tags: ['Clients'],
         responses: [
             new OA\Response(response: 200, description: 'Client created'),
             new OA\Response(response: 400, description: 'Invalid input'),
@@ -259,7 +261,7 @@ class ClientController extends AbstractController
     )]
     final public function addApiClient(): void
     {
-        $this->verifyCsrf();
+        if (!Security::verifyCsrfToken($_SERVER["HTTP_X_CSRF_TOKEN"] ?? "")) { $this->jsonError("Requête invalide", 403); return; }
         if ('POST' === $_SERVER['REQUEST_METHOD']) {
             try {
                 // Récupération des données JSON
@@ -300,6 +302,11 @@ class ClientController extends AbstractController
                 $client->setContactEmail($inputData['contactEmail'] ?? null);
                 $client->setContactPhone($inputData['contactPhone'] ?? null);
 
+                $currentUser = Security::getUser();
+                if ($currentUser) {
+                    $client->setCreatedby($currentUser->getId());
+                    $client->setUpdatedby($currentUser->getId());
+                }
                 $clientRepo->insert($client);
 
                 // Création de l'adresse si fournie
@@ -352,10 +359,6 @@ class ClientController extends AbstractController
     #[OA\Put(
         path: '/api/edit/client/{numSIRET}',
         summary: 'Edit client (JSON)',
-        tags: ['Clients'],
-        parameters: [
-            new OA\Parameter(name: 'numSIRET', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
-        ],
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\JsonContent(
@@ -366,7 +369,7 @@ class ClientController extends AbstractController
                     new OA\Property(property: 'contactLastname', type: 'string'),
                     new OA\Property(property: 'contactEmail', type: 'string', format: 'email'),
                     new OA\Property(property: 'contactPhone', type: 'string'),
-                    new OA\Property(property: 'address', type: 'object', properties: [
+                    new OA\Property(property: 'address', properties: [
                         new OA\Property(property: 'streetNumber', type: 'integer'),
                         new OA\Property(property: 'streetLetter', type: 'string'),
                         new OA\Property(property: 'streetName', type: 'string'),
@@ -374,10 +377,14 @@ class ClientController extends AbstractController
                         new OA\Property(property: 'state', type: 'string'),
                         new OA\Property(property: 'city', type: 'string'),
                         new OA\Property(property: 'country', type: 'string'),
-                    ]),
+                    ], type: 'object'),
                 ]
             )
         ),
+        tags: ['Clients'],
+        parameters: [
+            new OA\Parameter(name: 'numSIRET', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+        ],
         responses: [
             new OA\Response(response: 200, description: 'Client updated'),
             new OA\Response(response: 404, description: 'Client not found'),
@@ -385,7 +392,7 @@ class ClientController extends AbstractController
     )]
     final public function editApiClient(string $siret): void
     {
-        $this->verifyCsrf();
+        if (!Security::verifyCsrfToken($_SERVER["HTTP_X_CSRF_TOKEN"] ?? "")) { $this->jsonError("Requête invalide", 403); return; }
         if ('PUT' === $_SERVER['REQUEST_METHOD']) {
             try {
                 // Récupération des données JSON
@@ -424,6 +431,13 @@ class ClientController extends AbstractController
 
                 // Sauvegarde client avec requête personnalisée car la clé primaire est siret (string)
                 $clientSpecificRepo = new ClientRepository();
+                $currentUser = Security::getUser();
+
+                // updatedat = NOW() et updatedby renseigné pour l'historique
+                $client->setUpdatedat('NOW()');
+                if ($currentUser) {
+                    $client->setUpdatedby($currentUser->getId());
+                }
                 $clientSpecificRepo->updateBySiret($client, $siret);
 
                 // Mise à jour ou création de l'adresse
@@ -625,6 +639,7 @@ class ClientController extends AbstractController
     final public function searchApiClients(): void
     {
         try {
+            // On utilise QueryBuilder pour whereILike
             $searchTerm = trim($_GET['q'] ?? '');
             $clientRepo = new ClientRepository();
 

@@ -21,6 +21,14 @@ class ProjectRepository extends Repository
         ) ?? [];
     }
 
+    public function findActiveByClientId(string $siret): array
+    {
+        return $this->customQuery(
+            'SELECT * FROM project WHERE client_id = :siret AND isactive = true',
+            ['siret' => $siret]
+        ) ?? [];
+    }
+
     public function findActiveByUserId(string $userId): array
     {
         return $this->customQuery(
@@ -44,7 +52,7 @@ class ProjectRepository extends Repository
 
     public function countAll(): int
     {
-        $rows = $this->customQuery('SELECT id FROM project') ?? [];
+        $rows = $this->customQuery('SELECT id FROM project WHERE isactive = true') ?? [];
         return count($rows);
     }
 
@@ -61,9 +69,9 @@ class ProjectRepository extends Repository
             "SELECT p.*, COUNT(t.id) AS task_count,
                     SUM(CASE WHEN LOWER(s.name) LIKE '%termin%' OR LOWER(s.name) LIKE '%done%' THEN 1 ELSE 0 END) AS done_count
              FROM project p
-             LEFT JOIN task t ON t.project_id = p.id
+             LEFT JOIN task t ON t.project_id = p.id AND t.isactive = true
              LEFT JOIN state s ON t.state_id = s.id
-             WHERE p.project_manager_id = :userId
+             WHERE p.project_manager_id = :userId AND p.isactive = true
              GROUP BY p.id
              ORDER BY p.id DESC",
             ['userId' => $userId]
@@ -164,5 +172,33 @@ class ProjectRepository extends Repository
             "SELECT id FROM state WHERE LOWER(name) LIKE '%attente%' LIMIT 1"
         );
         return $rows[0]['id'] ?? null;
+    }
+
+    public function findArchivedById(string $id): ?array
+    {
+        $results = $this->customQuery(
+            'SELECT * FROM project WHERE id = :id AND isactive = false',
+            ['id' => $id]
+        );
+        return !empty($results) ? $results[0] : null;
+    }
+
+    public function findAllArchived(): array
+    {
+        return $this->customQuery(
+            'SELECT * FROM project WHERE isactive = false ORDER BY id DESC'
+        ) ?? [];
+    }
+
+    public function findArchivedByUserId(string $userId): array
+    {
+        return $this->customQuery(
+            'SELECT DISTINCT p.* FROM project p
+             INNER JOIN task t ON t.project_id = p.id
+             INNER JOIN usertaskREL ur ON ur.task_id = t.id
+             WHERE ur.user_id = :userId AND p.isactive = false
+             ORDER BY p.id DESC',
+            ['userId' => $userId]
+        ) ?? [];
     }
 }

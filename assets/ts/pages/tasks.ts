@@ -739,7 +739,8 @@ async function loadUsersAndProjectsIntoSelects(formOverlay: HTMLElement, task: T
         const projectsData = await projectsRes.json();
         const projects = projectsData?.data?.projects || projectsData?.projects || [];
         console.log('Projets reçus:', JSON.stringify(projects[0]));
-        const states = (await statesRes.json())?.states || [];
+        const statesData = await statesRes.json();
+        const states = statesData?.data?.states || statesData?.states || [];
         const absencesData = await absencesRes.json().catch(() => ({}));
         const absentIds: Set<string> = new Set(
             (absencesData.absences ?? []).map((a: {user_id: string}) => a.user_id)
@@ -1008,7 +1009,7 @@ async function handleCloseTaskSubmit(taskId: string, overlay: HTMLElement) {
     try {
         const statesRes = await fetch('/api/states');
         const statesData = await statesRes.json();
-        const states: Array<{ id: string, name: string }> = statesData.states || [];
+        const states: Array<{ id: string, name: string }> = statesData?.data?.states || statesData?.states || [];
         const termineeState = states.find(s =>
             ['terminé', 'terminée', 'terminées', 'done', 'completed', 'fini', 'finie', 'closed'].includes(s.name.toLowerCase().trim())
         );

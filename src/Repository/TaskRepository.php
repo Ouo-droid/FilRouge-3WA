@@ -90,7 +90,7 @@ class TaskRepository extends Repository
             'SELECT t.*, s.name AS state_name FROM task t
              INNER JOIN usertaskREL ut ON t.id = ut.task_id
              LEFT JOIN state s ON t.state_id = s.id
-             WHERE ut.user_id = :userId
+             WHERE ut.user_id = :userId AND t.isactive = true
              ORDER BY t.begindate DESC',
             ['userId' => $userId]
         ) ?? [];
@@ -101,7 +101,8 @@ class TaskRepository extends Repository
         return $this->customQuery(
             'SELECT t.id, s.name AS state_name
              FROM task t
-             LEFT JOIN state s ON t.state_id = s.id'
+             LEFT JOIN state s ON t.state_id = s.id
+             WHERE t.isactive = true'
         ) ?? [];
     }
 
@@ -110,7 +111,8 @@ class TaskRepository extends Repository
         return $this->customQuery(
             "SELECT t.id FROM task t
              LEFT JOIN state s ON t.state_id = s.id
-             WHERE LOWER(t.priority) = 'high'
+             WHERE t.isactive = true
+             AND LOWER(t.priority) = 'high'
              AND (s.name IS NULL OR (LOWER(s.name) NOT LIKE '%termin%' AND LOWER(s.name) NOT LIKE '%done%' AND LOWER(s.name) NOT LIKE '%clos%'))"
         ) ?? [];
     }
@@ -121,6 +123,7 @@ class TaskRepository extends Repository
             "SELECT s.name AS state_name, COUNT(t.id) AS cnt
              FROM task t
              LEFT JOIN state s ON t.state_id = s.id
+             WHERE t.isactive = true
              GROUP BY s.name
              ORDER BY cnt DESC
              LIMIT $limit"
@@ -137,6 +140,7 @@ class TaskRepository extends Repository
              LEFT JOIN usertaskREL ur ON ur.task_id = t.id
              LEFT JOIN users u ON u.id = ur.user_id
              WHERE t.project_id IN ($placeholders)
+             AND t.isactive = true
              AND (LOWER(t.priority) = 'high' OR t.theoreticalenddate <= NOW() + INTERVAL '7 days')
              AND (s.name IS NULL OR LOWER(s.name) NOT LIKE '%termin%')
              ORDER BY t.theoreticalenddate ASC
@@ -155,6 +159,7 @@ class TaskRepository extends Repository
              LEFT JOIN project p ON p.id = t.project_id
              LEFT JOIN usertaskREL ur ON ur.task_id = t.id
              WHERE t.project_id IN ($placeholders)
+             AND t.isactive = true
              AND ur.task_id IS NULL
              AND (s.name IS NULL OR LOWER(s.name) NOT LIKE '%termin%')
              ORDER BY t.theoreticalenddate ASC",
@@ -168,7 +173,7 @@ class TaskRepository extends Repository
             'SELECT t.id, s.name AS state_name FROM task t
              INNER JOIN usertaskREL ut ON t.id = ut.task_id
              LEFT JOIN state s ON t.state_id = s.id
-             WHERE ut.user_id = :userId AND t.updatedat >= :weekStart',
+             WHERE ut.user_id = :userId AND t.isactive = true AND t.updatedat >= :weekStart',
             ['userId' => $userId, 'weekStart' => $weekStart]
         ) ?? [];
     }
@@ -244,5 +249,87 @@ class TaskRepository extends Repository
             'UPDATE task SET state_id = :stateId WHERE project_id = :projectId',
             ['stateId' => $stateId, 'projectId' => $projectId]
         );
+    }
+
+    public function updateTask(Task $task, string $taskId): void
+    {
+        $this->customQuery(
+            'UPDATE task
+             SET name = :name,
+                 description = :description,
+                 type = :type,
+                 format = :format,
+                 priority = :priority,
+                 difficulty = :difficulty,
+                 effortrequired = :effortrequired,
+                 effortmade = :effortmade,
+                 project_id = :project_id,
+                 state_id = :state_id,
+                 begindate = :begindate,
+                 theoreticalenddate = :theoreticalenddate,
+                 realenddate = :realenddate,
+                 updatedat = NOW(),
+                 updatedby = :updatedby
+             WHERE id = :id',
+            [
+                'name'               => $task->getName(),
+                'description'        => $task->getDescription(),
+                'type'               => $task->getType(),
+                'format'             => $task->getFormat(),
+                'priority'           => $task->getPriority(),
+                'difficulty'         => $task->getDifficulty(),
+                'effortrequired'     => $task->getEffortrequired(),
+                'effortmade'         => $task->getEffortmade(),
+                'project_id'         => $task->getProjectId(),
+                'state_id'           => $task->getStateId(),
+                'begindate'          => $task->getBeginDate()?->format('Y-m-d'),
+                'theoreticalenddate' => $task->getTheoreticalEndDate()?->format('Y-m-d'),
+                'realenddate'        => $task->getRealEndDate()?->format('Y-m-d'),
+                'updatedby'          => $task->getUpdatedby(),
+                'id'                 => $taskId,
+            ]
+        );
+    }
+
+    public function softDelete(string $taskId, ?string $updatedBy): void
+    {
+        $this->customQuery(
+            'UPDATE task
+             SET isactive = false,
+                 updatedat = NOW(),
+                 updatedby = :updatedby
+             WHERE id = :id',
+            ['updatedby' => $updatedBy, 'id' => $taskId]
+        );
+    }
+
+    public function archiveByProject(string $projectId, ?string $updatedBy): void
+    {
+        $this->customQuery(
+            'UPDATE task
+             SET isactive = false,
+                 updatedat = NOW(),
+                 updatedby = :updatedby
+             WHERE project_id = :projectId',
+            ['updatedby' => $updatedBy, 'projectId' => $projectId]
+        );
+    }
+
+    public function findAllArchived(): array
+    {
+        return $this->customQuery(
+            'SELECT * FROM task WHERE isactive = false ORDER BY id DESC'
+        ) ?? [];
+    }
+
+    public function findArchivedByUserId(string $userId): array
+    {
+        return $this->customQuery(
+            'SELECT t.* FROM task t
+             INNER JOIN usertaskREL ur ON ur.task_id = t.id
+             WHERE ur.user_id = :userId AND t.isactive = false
+             ORDER BY t.id DESC',
+            ['userId' => $userId]
+        ) ?? [];
     }
 }

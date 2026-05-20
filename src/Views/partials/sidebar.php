@@ -55,6 +55,13 @@ function isActive($path, $currentPath)
                 <span><?php echo $userRole === 'USER' ? 'Mes tâches' : 'Tâches'; ?></span>
             </a>
 
+            <?php /* ── Historique : tous les rôles ── */ ?>
+            <?php $active = isActive('/history', $currentPath); ?>
+            <a class="sidebar-link <?php echo $active; ?>" href="/history" <?php echo $active ? 'aria-current="page"' : ''; ?>>
+                <i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i>
+                <span>Historique</span>
+            </a>
+
             <?php /* ── Clients : tous sauf USER ── */ ?>
             <?php if ($userRole !== 'USER') : ?>
                 <?php $active = isActive('/clients', $currentPath); ?>
